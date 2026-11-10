@@ -4,3 +4,6 @@ node_modules/
 .trae/
 .thumbs/
 .workbuddy/
+data/
+.env
+*.tar
