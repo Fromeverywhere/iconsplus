@@ -7,7 +7,10 @@
 - ⚡ 缩略图加速（sharp 自动生成，缺图回退原图，不污染图标库）
 - 🔐 管理后台：默认 `admin` / `iconsplus`
 - 📥 用户提交「网址 + 接口」→ 审核通过后自动收录图标（SSRF 防护）
-- 🛡️ 防盗链（Referer 白名单，同站放行）
+- 🛡️ 防盗链（Referer 白名单 / 黑名单双控，同站放行）
+- 🔄 异步导入（审核即返回，后台拉取图标，状态实时可见）
+- 🚫 提交去重（同一站点 / 接口不重复进审核）
+- 📊 管理后台统计面板（累计 / 待审 / 已收录 / 导入数 / 分类数）
 
 ## 快速开始
 ```bash
@@ -37,7 +40,10 @@ docker compose up -d --build
 
 ## 环境变量
 见 `.env.example`：`SITE_NAME`、`ADMIN_USERNAME/PASSWORD`、`SESSION_SECRET`、
-`HOTLINK_*`、`SUBMISSION_RATE_LIMIT`、`THUMB_*`。
+`HOTLINK_ENABLED` / `HOTLINK_ALLOWLIST`（白名单）/ `HOTLINK_DENYLIST`（黑名单）/ `HOTLINK_ALLOW_EMPTY_REFERER`、
+`SUBMISSION_RATE_LIMIT`、`THUMB_*`。
+
+> 审核通过后图标在**后台异步**下载（不阻塞页面），可在管理后台实时查看导入进度与结果。
 
 ## 目录
 ```

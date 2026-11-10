@@ -36,6 +36,11 @@ function createHotlinkMiddleware(getSettings) {
     // 同站永远放行（站点自身加载图标）
     if (refHost && refHost === requestHost) return next();
 
+    // 黑名单域名（外部引用命中直接拦截，优先级高于白名单）
+    if (cfg.denylist && cfg.denylist.length && refHost && hostMatches(refHost, cfg.denylist)) {
+      return res.status(403).type('text/plain').send('403 Forbidden: hotlink denied domain');
+    }
+
     // 白名单后缀匹配
     if (hostMatches(refHost, cfg.allowlist)) return next();
 

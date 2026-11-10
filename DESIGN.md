@@ -70,3 +70,22 @@ docker compose up -d --build   # 端口 28080 -> 5000，镜像名 iconsplus:dev
 - 导入改为真正的异步任务队列 + 进度反馈
 - 用户提交图标做内容安全审核（除类型/大小外的恶意文件）
 - 多管理员 / 角色权限
+
+## 8. v1.1 优化（2026-11-10 末）
+把上版"下一步建议"中的部分落地：
+
+1. **异步导入队列（核心）**：审核通过不再同步阻塞 HTTP 响应，而是立即返回 `importing`，后台拉取图标落盘，状态经 `pending → importing → approved | failed` 流转。管理后台轮询 `GET /api/admin/submissions/:id` 实时显示"导入中 → 成功/失败"，失败项展示原因。避免长请求超时、提升并发健壮性。
+2. **提交去重**：同一站点/接口（按规范化 URL 比对 host+path，忽略 fragment / 默认端口 / 大小写）若仍处于 pending / importing / approved，直接返回 409 拒绝重复提交。
+3. **防盗链规则引擎增强**：在原有白名单 + 同站放行 + 空 Referer 可配基础上，新增**黑名单域名**（env `HOTLINK_DENYLIST` 或后台设置），外部引用域名命中黑名单直接 403，优先级高于白名单。
+4. **管理后台可视化**：顶部统计卡片（累计提交 / 待审核 / 已收录 / 导入图标数 / 分类数，来自 `GET /api/admin/stats`）；状态徽章新增"导入中"（脉冲动画）与"失败"（红色 + 原因提示）；拒绝可填原因。
+5. **工程化**：包名统一为 `iconsplus`；新增 `npm run dev`（node --watch 热重载）；`/static` 加 1 天缓存；全局友好 404。
+
+### 修改后的接口
+- `POST /api/submissions`：新增 409 去重返回。
+- `POST /api/admin/submissions/:id/approve`：改为**立即返回 `{ok, status:"importing"}`**，实际导入后台异步执行（不阻塞）。
+- 新增 `GET /api/admin/stats`：返回 `{ total, byStatus, importedIconsTotal, categories }`。
+- `POST /api/admin/settings`：hotlink 配置新增 `denylist` 字段。
+
+### 已知边界
+- 异步导入是进程内 fire-and-forget（单实例足够）；多实例部署需引入共享队列（Redis/Bull）或加分布式锁，否则可能重复拉取。
+- Referer 防盗链仍为弱防护（可被伪造 Referer 绕过），黑名单/白名单用于阻断已知盗链站；严格场景建议升级签名 token。

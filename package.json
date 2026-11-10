@@ -1,10 +1,11 @@
 {
-  "name": "xg-icons-hub",
-  "version": "1.0.0",
-  "description": "又一个图标托管项目~",
+  "name": "iconsplus",
+  "version": "1.1.0",
+  "description": "icons+ 图标托管：分类图标、外链加速、提交共建、后台审核与防盗链。基于 xg-icons-hub 构建。",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
     "build": "node build.js",
     "postinstall": "node build.js",
     "deploy": "npm run build",
@@ -12,16 +13,21 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/verkyer/xg-icons-hub.git"
+    "url": "git+https://github.com/Fromeverywhere/iconsplus.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "icons",
+    "icon-hub",
+    "cdn",
+    "hotlink"
+  ],
+  "author": "icons+",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/verkyer/xg-icons-hub/issues"
+    "url": "https://github.com/Fromeverywhere/iconsplus/issues"
   },
-  "homepage": "https://github.com/verkyer/xg-icons-hub#readme",
+  "homepage": "https://github.com/Fromeverywhere/iconsplus#readme",
   "dependencies": {
     "sharp": "^0.34.0"
   },

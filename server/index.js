@@ -56,7 +56,7 @@ app.get('/thumbs/*', (req, res) => {
   });
 });
 
-app.use('/static', express.static(path.join(__dirname, '../static')));
+app.use('/static', express.static(path.join(__dirname, '../static'), { maxAge: '1d' }));
 
 // ============ 公开 API ============
 app.get('/api/config.json', (req, res) => {
@@ -101,6 +101,18 @@ app.post('/api/submissions', (req, res) => {
     return res.status(400).json({ error: 'siteUrl / apiUrl 不是合法 URL' });
   }
 
+  // 去重：同一站点/接口若仍在流转中，直接拒绝重复提交
+  const normApi = store.normalizeUrl(apiUrl);
+  const normSite = store.normalizeUrl(siteUrl);
+  const dup = store.findDuplicate(normApi, normSite);
+  if (dup) {
+    return res.status(409).json({
+      error: '该站点或接口已提交过（状态：' + dup.status + '），请勿重复提交',
+      id: dup.id,
+      status: dup.status
+    });
+  }
+
   const item = store.createSubmission({ siteName, siteUrl, apiUrl, contact, note });
   res.status(201).json({ ok: true, id: item.id, status: item.status });
 });
@@ -136,27 +148,48 @@ app.get('/api/admin/submissions/:id', auth.requireAdmin, (req, res) => {
   res.json(item);
 });
 
-app.post('/api/admin/submissions/:id/approve', auth.requireAdmin, async (req, res) => {
+app.post('/api/admin/submissions/:id/approve', auth.requireAdmin, (req, res) => {
   const item = store.getSubmission(req.params.id);
   if (!item) return res.status(404).json({ error: 'not found' });
   if (item.status === 'approved') {
-    return res.json({ ok: true, already: true, imported: item.imported });
+    return res.json({ ok: true, already: true, status: item.status, imported: item.imported });
   }
-  try {
-    const result = await importer.importFromSubmission(item);
-    const updated = store.updateSubmission(item.id, {
-      status: 'approved',
-      reviewedAt: Date.now(),
-      reviewedBy: req.admin,
-      imported: result
+  if (item.status === 'importing') {
+    return res.json({ ok: true, already: 'importing', status: item.status });
+  }
+  // 先立即返回 importing，图标拉取在后台异步完成，避免长请求超时
+  store.updateSubmission(item.id, {
+    status: 'importing',
+    reviewedAt: Date.now(),
+    reviewedBy: req.admin,
+    importStartedAt: Date.now()
+  });
+  res.json({ ok: true, status: 'importing' });
+
+  importer
+    .importFromSubmission(item)
+    .then((result) => {
+      const finalStatus =
+        result.imported === 0 && result.failed.length > 0 ? 'failed' : 'approved';
+      store.updateSubmission(item.id, {
+        status: finalStatus,
+        imported: result,
+        importFinishedAt: Date.now()
+      });
+      if (thumbnailer.isAvailable()) thumbnailer.start();
+    })
+    .catch((e) => {
+      console.error('[import] 异步导入失败:', e);
+      store.updateSubmission(item.id, {
+        status: 'failed',
+        imported: { error: e.message },
+        importFinishedAt: Date.now()
+      });
     });
-    // 触发缩略图重新扫库
-    if (thumbnailer.isAvailable()) thumbnailer.start();
-    res.json({ ok: true, result, imported: updated.imported });
-  } catch (e) {
-    console.error(e);
-    res.status(400).json({ error: '导入失败: ' + e.message });
-  }
+});
+
+app.get('/api/admin/stats', auth.requireAdmin, (req, res) => {
+  res.json(store.getStats());
 });
 
 app.post('/api/admin/submissions/:id/reject', auth.requireAdmin, (req, res) => {
@@ -193,6 +226,22 @@ app.get('/', (req, res) => {
 
 app.get('/admin', (req, res) => {
   res.type('html').send(fs.readFileSync(path.join(__dirname, '../views/admin.html'), 'utf-8'));
+});
+
+// 友好 404（必须注册在所有路由之后）
+app.use((req, res) => {
+  if (req.accepts('html')) {
+    res
+      .status(404)
+      .type('html')
+      .send(
+        '<!doctype html><meta charset="utf-8"><title>404</title>' +
+          '<div style="font-family:system-ui;max-width:480px;margin:18vh auto;text-align:center;color:#1f2329">' +
+          '<h1>404</h1><p>页面不存在。</p><p><a href="/" style="color:#4f46e5">返回首页</a></p></div>'
+      );
+  } else {
+    res.status(404).json({ error: 'Not Found' });
+  }
 });
 
 if (!process.env.SESSION_SECRET) {

@@ -22,6 +22,13 @@
     .badge.pending { background: #fef3c7; color: #92400e; }
     .badge.approved { background: #dcfce7; color: #166534; }
     .badge.rejected { background: #fee2e2; color: #991b1b; }
+    .badge.importing { background: #dbeafe; color: #1e40af; animation: pulse 1.2s ease-in-out infinite; }
+    .badge.failed { background: #fde2e2; color: #b91c1c; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+    .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+    .stat-card .num { font-size: 24px; font-weight: 700; }
+    .stat-card .lbl { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
     .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
     .row-actions .btn { padding: 5px 10px; font-size: 12px; }
     .filters { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
@@ -55,6 +62,14 @@
       <div class="who"><span id="who"></span> <button class="btn btn-ghost" id="logoutBtn">退出</button></div>
     </div>
 
+    <div class="stat-cards">
+      <div class="stat-card"><div class="num" id="statTotal">0</div><div class="lbl">累计提交</div></div>
+      <div class="stat-card"><div class="num" id="statPending">0</div><div class="lbl">待审核</div></div>
+      <div class="stat-card"><div class="num" id="statApproved">0</div><div class="lbl">已收录</div></div>
+      <div class="stat-card"><div class="num" id="statImported">0</div><div class="lbl">导入图标数</div></div>
+      <div class="stat-card"><div class="num" id="statCats">0</div><div class="lbl">分类数</div></div>
+    </div>
+
     <div class="tabs">
       <div class="tab active" data-tab="subs">提交审核</div>
       <div class="tab" data-tab="settings">防盗链设置</div>
@@ -83,6 +98,9 @@
         </label>
         <label class="switch">
           <input type="checkbox" id="hlEmpty" /> 允许空 Referer（直接访问 / 书签）
+        </label>
+        <label>拒绝外链黑名单（逗号分隔，命中即 403，优先级高于白名单）
+          <textarea id="hlDeny" rows="2" placeholder="spam.example.com"></textarea>
         </label>
         <div id="setMsg" class="form-msg"></div>
         <div style="display:flex;gap:8px"><button class="btn btn-primary" id="saveSettings">保存设置</button></div>

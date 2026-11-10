@@ -20,6 +20,7 @@
     $('#who').textContent = '当前：' + user;
     loadSubs();
     loadSettings();
+    loadStats();
   }
   function showLogin() {
     $('#dashView').classList.add('hidden');
@@ -56,7 +57,8 @@
         '<td>' + esc(s.siteName) + '</td>' +
         '<td><a href="' + esc(s.siteUrl) + '" target="_blank" rel="noopener">' + esc(shorten(s.siteUrl)) + '</a></td>' +
         '<td><code>' + esc(shorten(s.apiUrl)) + '</code></td>' +
-        '<td><span class="badge ' + s.status + '">' + statusText(s.status) + '</span></td>' +
+        '<td><span class="badge ' + s.status + '">' + statusText(s.status) + '</span>' +
+          (s.status === 'failed' && s.imported && s.imported.error ? ' <span class="muted" title="' + esc(s.imported.error) + '">⚠</span>' : '') + '</td>' +
         '<td class="muted">' + time + '</td>' +
         '<td><div class="row-actions">' +
           '<button class="btn" data-act="view" data-id="' + s.id + '">详情</button>' +
@@ -91,14 +93,36 @@
     btn.disabled = true; btn.textContent = '导入中…';
     const r = await api('/api/admin/submissions/' + id + '/approve', { method: 'POST' });
     const d = await r.json().catch(() => ({}));
-    if (r.ok) {
-      const res = d.result || {};
-      toast('导入完成：成功 ' + (res.imported || 0) + ' / 共 ' + (res.total || 0) + (res.failed && res.failed.length ? '，失败 ' + res.failed.length : ''));
-      loadSubs();
-    } else {
+    if (!r.ok) {
       toast('失败：' + (d.error || '未知错误'));
       btn.disabled = false; btn.textContent = '通过';
+      return;
     }
+    toast('已提交导入，后台正在拉取图标…');
+    pollStatus(id);
+  }
+
+  // 轮询单个提交状态，直到导入完成（或失败/超时）
+  function pollStatus(id) {
+    const iv = setInterval(async () => {
+      try {
+        const r = await api('/api/admin/submissions/' + id);
+        if (!r.ok) return;
+        const s = await r.json();
+        if (s.status !== 'importing') {
+          clearInterval(iv);
+          if (s.status === 'approved') {
+            const res = s.imported || {};
+            toast('导入完成：成功 ' + (res.imported || 0) + ' / 共 ' + (res.total || 0) + (res.failed && res.failed.length ? '，失败 ' + res.failed.length : ''));
+          } else if (s.status === 'failed') {
+            toast('导入失败：' + ((s.imported && s.imported.error) || '部分图标拉取失败'));
+          }
+          loadSubs();
+          loadStats();
+        }
+      } catch (_) {}
+    }, 1500);
+    setTimeout(() => clearInterval(iv), 180000); // 3 分钟兜底
   }
 
   async function viewDetail(id) {
@@ -123,6 +147,7 @@
     const d = r.ok ? (await r.json()).hotlink : {};
     $('#hlEnabled').checked = !!d.enabled;
     $('#hlAllow').value = (d.allowlist || []).join(', ');
+    $('#hlDeny').value = (d.denylist || []).join(', ');
     $('#hlEmpty').checked = d.allowEmptyReferer !== false;
   }
   $('#saveSettings').onclick = async () => {
@@ -131,6 +156,7 @@
       hotlink: {
         enabled: $('#hlEnabled').checked,
         allowlist: $('#hlAllow').value.split(',').map((s) => s.trim()).filter(Boolean),
+        denylist: $('#hlDeny').value.split(',').map((s) => s.trim()).filter(Boolean),
         allowEmptyReferer: $('#hlEmpty').checked
       }
     };
@@ -152,7 +178,17 @@
   // ---------- utils ----------
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   function shorten(s) { s = String(s || ''); return s.length > 42 ? s.slice(0, 42) + '…' : s; }
-  function statusText(s) { return { pending: '待审核', approved: '已通过', rejected: '已拒绝' }[s] || s; }
+  function statusText(s) { return { pending: '待审核', importing: '导入中', approved: '已通过', rejected: '已拒绝', failed: '失败' }[s] || s; }
+  async function loadStats() {
+    const r = await api('/api/admin/stats');
+    const d = r.ok ? await r.json() : {};
+    setText('#statTotal', d.total || 0);
+    setText('#statPending', (d.byStatus && d.byStatus.pending) || 0);
+    setText('#statApproved', (d.byStatus && d.byStatus.approved) || 0);
+    setText('#statImported', d.importedIconsTotal || 0);
+    setText('#statCats', d.categories || 0);
+  }
+  function setText(sel, v) { const el = $(sel); if (el) el.textContent = v; }
   let tt; function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.remove('hidden'); clearTimeout(tt); tt = setTimeout(() => el.classList.add('hidden'), 2600); }
 
   // 启动
