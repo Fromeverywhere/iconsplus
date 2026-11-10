@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>icons+ 管理后台</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    .admin-wrap { max-width: 1080px; margin: 0 auto; padding: 40px 20px; }
+    .login-box { max-width: 360px; margin: 12vh auto 0; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; box-shadow: var(--shadow); }
+    .login-box h1 { font-size: 20px; margin: 0 0 18px; }
+    .tabs { display: flex; gap: 8px; margin: 0 0 18px; border-bottom: 1px solid var(--border); }
+    .tab { padding: 10px 14px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--text-muted); }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--text-muted); font-weight: 600; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+    .badge.pending { background: #fef3c7; color: #92400e; }
+    .badge.approved { background: #dcfce7; color: #166534; }
+    .badge.rejected { background: #fee2e2; color: #991b1b; }
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .row-actions .btn { padding: 5px 10px; font-size: 12px; }
+    .filters { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filters .btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .settings-row { display: flex; flex-direction: column; gap: 12px; max-width: 520px; }
+    .settings-row label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--text-muted); }
+    .switch { display: flex; align-items: center; gap: 10px; }
+    .topbar-admin { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .topbar-admin .who { color: var(--text-muted); font-size: 13px; }
+    pre.audit { background: var(--surface-2); padding: 10px; border-radius: 8px; overflow: auto; font-size: 12px; }
+  </style>
+</head>
+<body data-theme="light">
+  <!-- 登录 -->
+  <div id="loginView" class="admin-wrap">
+    <div class="login-box">
+      <h1>icons+ 管理后台</h1>
+      <form id="loginForm" class="form">
+        <label>用户名<input name="username" required autocomplete="username" /></label>
+        <label>密码<input name="password" type="password" required autocomplete="current-password" /></label>
+        <div id="loginMsg" class="form-msg"></div>
+        <button type="submit" class="btn btn-primary">登录</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 后台主体 -->
+  <div id="dashView" class="admin-wrap hidden">
+    <div class="topbar-admin">
+      <h1>icons+ 管理后台</h1>
+      <div class="who"><span id="who"></span> <button class="btn btn-ghost" id="logoutBtn">退出</button></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="subs">提交审核</div>
+      <div class="tab" data-tab="settings">防盗链设置</div>
+    </div>
+
+    <section id="panel-subs" class="panel active">
+      <div class="filters" id="statusFilters">
+        <button class="btn active" data-status="all">全部</button>
+        <button class="btn" data-status="pending">待审核</button>
+        <button class="btn" data-status="approved">已通过</button>
+        <button class="btn" data-status="rejected">已拒绝</button>
+      </div>
+      <table>
+        <thead><tr><th>站点</th><th>网址</th><th>接口</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead>
+        <tbody id="subsBody"></tbody>
+      </table>
+    </section>
+
+    <section id="panel-settings" class="panel">
+      <div class="settings-row">
+        <label class="switch">
+          <input type="checkbox" id="hlEnabled" /> 启用防盗链（Referer 校验）
+        </label>
+        <label>允许外链白名单（逗号分隔，按 host 后缀匹配，支持子域）
+          <textarea id="hlAllow" rows="3" placeholder="example.com, foo.example.com"></textarea>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="hlEmpty" /> 允许空 Referer（直接访问 / 书签）
+        </label>
+        <div id="setMsg" class="form-msg"></div>
+        <div style="display:flex;gap:8px"><button class="btn btn-primary" id="saveSettings">保存设置</button></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 详情弹窗 -->
+  <div id="detailModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <button class="modal-close" id="detailClose">×</button>
+      <h2 id="detailTitle"></h2>
+      <pre class="audit" id="detailBody"></pre>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/static/admin.js"></script>
+</body>
+</html>

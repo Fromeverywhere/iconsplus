@@ -1,0 +1,43 @@
+services:
+  iconsplus:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: iconsplus:dev
+    container_name: iconsplus-dev
+    ports:
+      - "28080:5000"
+    volumes:
+      - ./images:/app/images
+      - ./data:/app/data
+    environment:
+      - SITE_NAME=icons+
+      # 缩略图：列表显示缩略图，点开预览 / 复制链接 / 下载 / 新窗口一律仍是原图
+      - THUMB_ENABLED=true          # 总开关，false 时完全回退到原图
+      - THUMB_WATCH=true            # 目录监控开关
+      - THUMB_SCAN_INTERVAL=300     # 定时全量扫库间隔（秒），0 = 关闭；bind mount 收不到事件时靠它兜底
+      # 管理后台（默认 admin / iconsplus，生产务必修改）
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=iconsplus
+      # 防盗链（Referer 校验）
+      - HOTLINK_ENABLED=true
+      - HOTLINK_ALLOWLIST=localhost
+      - HOTLINK_ALLOW_EMPTY_REFERER=true
+      # 公开提交限流（每 IP 每小时上限）
+      - SUBMISSION_RATE_LIMIT=20
+      # 会话密钥：生产务必设置随机长串（如 SESSION_SECRET: "${SESSION_SECRET}"）
+      # 以下为可选微调（不设即用默认值）：
+      # - THUMB_DIR=/app/thumbs             # 缩略图目录（容器内，务必与 /app/images 分开）
+      # - THUMB_SIZE=128                    # 缩略图最大边长 px（卡片仅显示 52px，128 覆盖 2x 屏）
+      # - THUMB_QUALITY=75                  # WebP 质量 10-100
+      # - THUMB_CONCURRENCY=4               # 启动扫库并发数，避免一次吃满 CPU
+      # - THUMB_WATCH_DEBOUNCE=1200         # 目录监控防抖（毫秒）
+      # 站点可选变量（按需打开）：
+      # - LOGO_IMG=favicon.ico        # 路径或完整 URL
+      # - FAVICON=/static/favicon.ico
+      # - COPYRIGHT=HTML、文本
+      # - ICP=粤ICP备12345678号-1
+      # - SEO_DESC=站点描述
+      # - UMAMI_URL=https://cloud.umami.is
+      # - UMAMI_SITE_ID=网站 ID
+    restart: unless-stopped

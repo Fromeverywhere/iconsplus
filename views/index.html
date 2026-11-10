@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="icons+ 图标托管：分类图标、外链加速、提交共建。" />
+  <title>icons+</title>
+  <link id="faviconLink" rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body data-theme="light">
+  <header class="topbar">
+    <div class="brand">
+      <img id="siteLogo" src="/static/favicon.svg" alt="logo" class="brand-logo" />
+      <span id="siteTitle" class="brand-title">icons+</span>
+    </div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      <input id="searchInput" type="search" placeholder="搜索图标…" aria-label="搜索图标" />
+    </div>
+    <div class="actions">
+      <button id="submitBtn" class="btn btn-primary">提交图标</button>
+      <a id="adminLink" class="btn btn-ghost" href="/admin">管理</a>
+      <button id="themeToggle" class="btn btn-icon" title="切换主题" aria-label="切换主题">
+        <span class="theme-sun">☀</span><span class="theme-moon">☾</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <nav aria-label="分类">
+        <ul id="categoryList" class="cat-list"></ul>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <div class="content-head">
+        <h1 id="currentView">全部图标</h1>
+        <p id="resultSummary" class="muted" aria-live="polite">加载中…</p>
+      </div>
+      <div id="iconGrid" class="grid"></div>
+      <div id="emptyState" class="empty hidden">没有找到匹配的图标</div>
+    </main>
+  </div>
+
+  <!-- 预览弹窗 -->
+  <div id="previewModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <button class="modal-close" id="previewClose" aria-label="关闭">×</button>
+      <div class="preview-img-wrap"><img id="previewImg" alt="preview" /></div>
+      <div class="preview-meta">
+        <div id="previewName" class="preview-name"></div>
+        <code id="previewUrl" class="preview-url"></code>
+        <div class="preview-actions">
+          <button class="btn btn-primary" id="copyLink">复制链接</button>
+          <a class="btn btn-ghost" id="downloadLink" download>下载</a>
+          <a class="btn btn-ghost" id="openLink" target="_blank" rel="noopener">新窗口打开</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 提交弹窗 -->
+  <div id="submitModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <button class="modal-close" id="submitClose" aria-label="关闭">×</button>
+      <h2>提交图标源</h2>
+      <p class="muted">填写你的网站与图标接口，审核通过后即可将图标收录进 icons+。</p>
+      <form id="submitForm" class="form">
+        <label>站点名称 *<input name="siteName" required maxlength="60" placeholder="如 MyIcons" /></label>
+        <label>站点网址 *<input name="siteUrl" required type="url" placeholder="https://example.com" /></label>
+        <label>图标接口 *<input name="apiUrl" required type="url" placeholder="https://example.com/api/icons" /></label>
+        <label>联系方式<input name="contact" maxlength="120" placeholder="邮箱 / 主页（选填）" /></label>
+        <label>备注<textarea name="note" rows="3" maxlength="300" placeholder="选填"></textarea></label>
+        <p class="form-hint">接口需返回 JSON：<code>{ "category": "可选", "icons": [ { "name": "xx", "url": "https://…/x.png" } ] }</code></p>
+        <div id="submitMsg" class="form-msg"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" id="submitCancel">取消</button>
+          <button type="submit" class="btn btn-primary">提交审核</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

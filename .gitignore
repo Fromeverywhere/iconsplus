@@ -1,0 +1,32 @@
+# Local AI/editor metadata
+.codebuddy/
+.trae/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+
+# Wrangler local state
+.wrangler/
+
+# Logs
+*.log
+
+# Locally generated thumbnails (Docker uses /app/thumbs inside the container)
+.thumbs/
+
+# Local agent workspace data (notes, memory)
+.workbuddy/
+
+# Runtime data (submissions, settings)
+data/
