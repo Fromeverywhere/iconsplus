@@ -13,6 +13,8 @@
   let CATEGORIES = []; // [{name, icons:[files]}]
   let activeCat = 'all';
   let keyword = '';
+  let CURRENT_USER = null; // {username, role}
+  const ROLE_LABEL = { super: '超级管理员', uploader: '上传+调用', viewer: '仅调用' };
 
   // ---------- 数据 ----------
   async function loadConfig() {
@@ -34,6 +36,34 @@
     }
     renderCategories();
     renderGrid();
+  }
+
+  // ---------- 登录态与角色 ----------
+  async function loadMe() {
+    try {
+      const r = await fetch('/api/admin/me', { credentials: 'same-origin' });
+      CURRENT_USER = r.ok ? await r.json() : null;
+    } catch (_) {
+      CURRENT_USER = null;
+    }
+    renderAccount();
+  }
+
+  function renderAccount() {
+    const chip = $('#accountChip');
+    const link = $('#adminLink');
+    if (CURRENT_USER) {
+      chip.classList.remove('hidden');
+      link.classList.add('hidden');
+      $('#accountName').textContent = CURRENT_USER.username;
+      $('#accountAvatar').textContent = (CURRENT_USER.username || 'U').slice(0, 1).toUpperCase();
+      const rb = $('#accountRole');
+      rb.textContent = ROLE_LABEL[CURRENT_USER.role] || CURRENT_USER.role;
+      rb.className = 'role-badge role-' + CURRENT_USER.role;
+    } else {
+      chip.classList.add('hidden');
+      link.classList.remove('hidden');
+    }
   }
 
   // 映射保持：图标对外 URL 永远是 /images/<分类>/<文件>
@@ -115,7 +145,18 @@
   previewModal.onclick = (e) => { if (e.target === previewModal) previewModal.classList.add('hidden'); };
 
   // ---------- 提交 ----------
-  $('#submitBtn').onclick = () => submitModal.classList.remove('hidden');
+  $('#submitBtn').onclick = () => {
+    if (!CURRENT_USER) {
+      toast('请先登录后再提交');
+      setTimeout(() => (location.href = '/admin'), 600);
+      return;
+    }
+    if (CURRENT_USER.role === 'viewer') {
+      toast('你的角色（仅调用）无法提交图标');
+      return;
+    }
+    submitModal.classList.remove('hidden');
+  };
   $('#submitClose').onclick = () => submitModal.classList.add('hidden');
   $('#submitCancel').onclick = () => submitModal.classList.add('hidden');
   submitModal.onclick = (e) => { if (e.target === submitModal) submitModal.classList.add('hidden'); };
@@ -172,5 +213,5 @@
   });
 
   // 启动
-  loadConfig().then(loadIcons);
+  loadConfig().then(loadMe).then(loadIcons);
 })();

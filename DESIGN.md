@@ -39,17 +39,21 @@
 浏览器
  ├─ /            图库（重构 UI，映射不变）
  ├─ /admin       管理后台（登录 / 审核队列 / 防盗链设置）
- ├─ /api/icons.json, /api/config.json      公开
- ├─ POST /api/submissions                   公开（限流）
- ├─ /api/admin/*                              需登录 cookie
+ ├─ /api/icons.json, /api/config.json      公开（仅调用）
+ ├─ POST /api/submissions                   需登录（超级管理员/上传+调用）或 API Token（限流）
+ ├─ /api/admin/*                              需登录 cookie（审核/设置/用户管理仅超级管理员）
  └─ /images/* , /thumbs/*                    静态资源 + 防盗链中间件
 ```
 模块：`server/index.js`（路由）+ `server/services/{iconScanner,thumbnailer,htmlTemplate,auth,store,hotlink,importer}.js`
 状态：`data/submissions.json`（提交）、`data/settings.json`（防盗链配置，后台可改）。
 
-## 5. 鉴权
-- 默认 `admin` / `iconsplus`，务必改 `ADMIN_PASSWORD`。
-- 会话：`HMAC-SHA256` 签名 cookie `iconsplus_session`，7 天过期。
+## 5. 鉴权与角色（v0.3 起）
+- 三档角色：**超级管理员 `super`** / **上传+调用 `uploader`** / **仅调用 `viewer`**。
+- 用户存储：`data/users.json`，密码用 `scrypt` + 随机盐哈希；每个用户带 `apiToken`（程序化接入）。
+- 首次启动用 `ADMIN_USERNAME`/`ADMIN_PASSWORD`（默认 `admin`/`iconsplus`）种子一个超级管理员。
+- 会话：`HMAC-SHA256` 签名 cookie `iconsplus_session`（含 `username`+`role`），7 天过期。
+- 中间件：`requireAuth`（任意登录）、`requireRole(...roles)`、`requireSuper`；`getUserByApiToken`（`Bearer` 或 `?token=`）。
+- 防误锁：不能删除自己；不能降级/禁用/删除「最后一个启用的超级管理员」。
 - `SESSION_SECRET` 未设置时启动告警（使用不安全默认值）。
 
 ## 6. 运行
@@ -67,11 +71,11 @@ docker compose up -d --build   # 端口 28080 -> 5000，镜像名 iconsplus:dev
 ## 7. 下一步建议
 - 把「提交接口契约」做成规范 + 示例源码，降低贡献门槛
 - 防盗链升级为签名 token（Referer 可伪造，弱防护）
-- 导入改为真正的异步任务队列 + 进度反馈
 - 用户提交图标做内容安全审核（除类型/大小外的恶意文件）
-- 多管理员 / 角色权限
+- 多实例部署引入共享导入队列
 
-## 8. v1.1 优化（2026-11-10 末）
+## 8. v0.2 优化（异步导入 / 去重 / 黑名单）
+> 说明：上一轮曾误标为「v1.1」，按版本节奏实为 **0.2**。
 把上版"下一步建议"中的部分落地：
 
 1. **异步导入队列（核心）**：审核通过不再同步阻塞 HTTP 响应，而是立即返回 `importing`，后台拉取图标落盘，状态经 `pending → importing → approved | failed` 流转。管理后台轮询 `GET /api/admin/submissions/:id` 实时显示"导入中 → 成功/失败"，失败项展示原因。避免长请求超时、提升并发健壮性。
@@ -89,3 +93,38 @@ docker compose up -d --build   # 端口 28080 -> 5000，镜像名 iconsplus:dev
 ### 已知边界
 - 异步导入是进程内 fire-and-forget（单实例足够）；多实例部署需引入共享队列（Redis/Bull）或加分布式锁，否则可能重复拉取。
 - Referer 防盗链仍为弱防护（可被伪造 Referer 绕过），黑名单/白名单用于阻断已知盗链站；严格场景建议升级签名 token。
+
+## 9. v0.3 角色权限与 UI 优化
+把「用户权限」从一个管理员扩展为三档角色，并据此重做后台 UI：
+
+### 9.1 角色模型
+- `super` 超级管理员：全部权限（审核、防盗链、统计、用户管理）。
+- `uploader` 上传+调用：提交图标源 + 调用 API；不能审核 / 改设置 / 管理用户。
+- `viewer` 仅调用：只能浏览图库 / 调用图标 API；不能提交。
+
+### 9.2 后端
+- 新增 `server/services/users.js`：`data/users.json`；`scrypt` 哈希；`apiToken`；种子超级管理员；`list/create/update/delete/authenticate/getUserByToken`。
+- `auth.js` 重构：会话 token 携带 `role`；新增 `requireAuth` / `requireRole` / `requireSuper` / `getUserByApiToken`。
+- 权限落地：
+  - `POST /api/submissions`：需 `super`/`uploader`（会话 cookie 或 `Bearer` token）。
+  - 审核 / 拒绝 / 删除 / 设置 / 统计 / 用户管理：`requireSuper`。
+  - `GET /api/my/submissions`：任意登录用户（super 看全部，其余看自己）。
+  - `GET /api/my/profile`：返回本人 `username/role/apiToken`。
+  - 用户管理：`GET/POST /api/admin/users`、`PUT/DELETE /api/admin/users/:id`、`POST /api/admin/users/:id/regenerate-token`。
+  - 防误锁：不能删除自己 / 不能降级·禁用·删除最后一个启用的超级管理员。
+- `store.js`：提交记录新增 `submittedBy`；新增 `getMySubmissions`。
+
+### 9.3 前端
+- 图库：顶栏账户 chip（头像 + 用户名 + 角色徽章）；「提交图标」按角色门禁（匿名→登录、viewer→提示无权限）。
+- 后台：按角色动态显示页签——
+  - super：审核队列 / 我的提交 / 防盗链设置 / 用户管理 / API 调用（统计卡片）；
+  - uploader：我的提交（含提交表单）/ API 调用；
+  - viewer：API 调用。
+- 用户管理表格：角色徽章、内联改角色、启用/禁用、重置 Token、删除。
+- API 调用页：展示个人 Token + 复制 + 调用示例（读列表 / 直链 / Token 提交）。
+
+### 9.4 映射不变
+`/images/<分类>/<文件>` 与 `/api/icons.json` 结构完全保持不变，本轮只加权限与 UI，不触碰映射。
+
+### 9.5 版本
+- `package.json` → `0.3.0`。按约定不做大版本跳跃。

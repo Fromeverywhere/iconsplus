@@ -91,6 +91,7 @@ function createSubmission(data) {
     normApiUrl: normalizeUrl(data.apiUrl),
     contact: String(data.contact || '').trim(),
     note: String(data.note || '').trim(),
+    submittedBy: String(data.submittedBy || '').trim() || null,
     status: 'pending',
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -122,6 +123,13 @@ function deleteSubmission(id) {
   const next = list.filter((s) => s.id !== id);
   writeJson(SUB_FILE, next);
   return list.length !== next.length;
+}
+
+// 我的提交：普通用户只看自己的；超级管理员传 includeAll=true 看全部
+function getMySubmissions(username, includeAll) {
+  const list = listSubmissions();
+  if (includeAll) return list;
+  return list.filter((s) => s.submittedBy === username);
 }
 
 function getStats() {
@@ -169,6 +177,7 @@ module.exports = {
   createSubmission,
   updateSubmission,
   deleteSubmission,
+  getMySubmissions,
   getStats,
   getSettings,
   saveSettings

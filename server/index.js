@@ -3,17 +3,22 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const { getIcons } = require('./services/iconScanner');
 const { applyHtml } = require('./services/htmlTemplate');
 const thumbnailer = require('./services/thumbnailer');
 const auth = require('./services/auth');
+const users = require('./services/users');
 const store = require('./services/store');
 const importer = require('./services/importer');
 const { createHotlinkMiddleware } = require('./services/hotlink');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// 首次运行时种子超级管理员（默认 admin / iconsplus）
+users.ensure();
 
 const CONFIG = {
   SITE_NAME: process.env.SITE_NAME || 'icons+',
@@ -58,7 +63,7 @@ app.get('/thumbs/*', (req, res) => {
 
 app.use('/static', express.static(path.join(__dirname, '../static'), { maxAge: '1d' }));
 
-// ============ 公开 API ============
+// ============ 公开 API（仅调用：所有人可读取，用于 CDN 引用） ============
 app.get('/api/config.json', (req, res) => {
   const settings = store.getSettings();
   res.json({ ...CONFIG, HOTLINK_ENABLED: !!settings.hotlink.enabled });
@@ -73,9 +78,16 @@ app.get('/api/icons.json', (req, res) => {
   }
 });
 
-// 公开提交（管理员审核）：网址 + 接口
+// ============ 提交（需 超级管理员 / 上传+调用）：网址 + 接口 ============
 const subHits = new Map();
 app.post('/api/submissions', (req, res) => {
+  // 鉴权：会话 cookie 或 API token（Bearer / ?token=）
+  const user = auth.getSessionUser(req) || auth.getUserByApiToken(req);
+  if (!user) return res.status(401).json({ error: '请先登录后再提交（或使用 API token）' });
+  if (user.role !== 'super' && user.role !== 'uploader') {
+    return res.status(403).json({ error: '当前角色（仅调用）无提交权限' });
+  }
+
   const ip =
     (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
     req.socket.remoteAddress ||
@@ -113,19 +125,25 @@ app.post('/api/submissions', (req, res) => {
     });
   }
 
-  const item = store.createSubmission({ siteName, siteUrl, apiUrl, contact, note });
+  const item = store.createSubmission({
+    siteName,
+    siteUrl,
+    apiUrl,
+    contact,
+    note,
+    submittedBy: user.username
+  });
   res.status(201).json({ ok: true, id: item.id, status: item.status });
 });
 
-// ============ 管理员 API ============
+// ============ 鉴权 ============
 app.post('/api/admin/login', (req, res) => {
   const { username, password } = req.body || {};
-  if (!auth.checkCredentials(username, password)) {
-    return res.status(401).json({ error: '用户名或密码错误' });
-  }
-  const token = auth.createSessionToken(username);
+  const u = users.authenticate(username, password);
+  if (!u) return res.status(401).json({ error: '用户名或密码错误，或账号已禁用' });
+  const token = auth.createSessionToken(u.username, u.role);
   auth.setSessionCookie(res, token);
-  res.json({ ok: true, username });
+  res.json({ ok: true, username: u.username, role: u.role });
 });
 
 app.post('/api/admin/logout', (req, res) => {
@@ -133,22 +151,36 @@ app.post('/api/admin/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/admin/me', auth.requireAdmin, (req, res) => res.json({ username: req.admin }));
+app.get('/api/admin/me', auth.requireAuth, (req, res) =>
+  res.json({ username: req.user.username, role: req.user.role })
+);
 
-app.get('/api/admin/submissions', auth.requireAdmin, (req, res) => {
-  const status = req.query.status;
+// 我的提交：超级管理员看全部，其余只看自己
+app.get('/api/my/submissions', auth.requireAuth, (req, res) => {
+  res.json(store.getMySubmissions(req.user.username, req.user.role === 'super'));
+});
+
+// 我的资料（含个人 API token，用于「仅调用 / 上传+调用」程序化接入）
+app.get('/api/my/profile', auth.requireAuth, (req, res) => {
+  const u = users.getUserByName(req.user.username);
+  if (!u) return res.status(404).json({ error: 'not found' });
+  res.json({ username: u.username, role: u.role, apiToken: u.apiToken });
+});
+
+// ============ 审核（仅超级管理员） ============
+app.get('/api/admin/submissions', auth.requireSuper, (req, res) => {
   let list = store.listSubmissions();
-  if (status) list = list.filter((s) => s.status === status);
+  if (req.query.status) list = list.filter((s) => s.status === req.query.status);
   res.json(list);
 });
 
-app.get('/api/admin/submissions/:id', auth.requireAdmin, (req, res) => {
+app.get('/api/admin/submissions/:id', auth.requireSuper, (req, res) => {
   const item = store.getSubmission(req.params.id);
   if (!item) return res.status(404).json({ error: 'not found' });
   res.json(item);
 });
 
-app.post('/api/admin/submissions/:id/approve', auth.requireAdmin, (req, res) => {
+app.post('/api/admin/submissions/:id/approve', auth.requireSuper, (req, res) => {
   const item = store.getSubmission(req.params.id);
   if (!item) return res.status(404).json({ error: 'not found' });
   if (item.status === 'approved') {
@@ -161,7 +193,7 @@ app.post('/api/admin/submissions/:id/approve', auth.requireAdmin, (req, res) => 
   store.updateSubmission(item.id, {
     status: 'importing',
     reviewedAt: Date.now(),
-    reviewedBy: req.admin,
+    reviewedBy: req.user.username,
     importStartedAt: Date.now()
   });
   res.json({ ok: true, status: 'importing' });
@@ -169,8 +201,7 @@ app.post('/api/admin/submissions/:id/approve', auth.requireAdmin, (req, res) => 
   importer
     .importFromSubmission(item)
     .then((result) => {
-      const finalStatus =
-        result.imported === 0 && result.failed.length > 0 ? 'failed' : 'approved';
+      const finalStatus = result.imported === 0 && result.failed.length > 0 ? 'failed' : 'approved';
       store.updateSubmission(item.id, {
         status: finalStatus,
         imported: result,
@@ -188,31 +219,86 @@ app.post('/api/admin/submissions/:id/approve', auth.requireAdmin, (req, res) => 
     });
 });
 
-app.get('/api/admin/stats', auth.requireAdmin, (req, res) => {
-  res.json(store.getStats());
-});
-
-app.post('/api/admin/submissions/:id/reject', auth.requireAdmin, (req, res) => {
+app.post('/api/admin/submissions/:id/reject', auth.requireSuper, (req, res) => {
   const updated = store.updateSubmission(req.params.id, {
     status: 'rejected',
     reviewedAt: Date.now(),
-    reviewedBy: req.admin,
+    reviewedBy: req.user.username,
     rejectReason: (req.body || {}).reason || ''
   });
   if (!updated) return res.status(404).json({ error: 'not found' });
   res.json({ ok: true });
 });
 
-app.delete('/api/admin/submissions/:id', auth.requireAdmin, (req, res) => {
+app.delete('/api/admin/submissions/:id', auth.requireSuper, (req, res) => {
   const ok = store.deleteSubmission(req.params.id);
   if (!ok) return res.status(404).json({ error: 'not found' });
   res.json({ ok: true });
 });
 
-app.get('/api/admin/settings', auth.requireAdmin, (req, res) => res.json(store.getSettings()));
-app.post('/api/admin/settings', auth.requireAdmin, (req, res) => {
+app.get('/api/admin/stats', auth.requireSuper, (req, res) => {
+  res.json(store.getStats());
+});
+
+app.get('/api/admin/settings', auth.requireSuper, (req, res) => res.json(store.getSettings()));
+app.post('/api/admin/settings', auth.requireSuper, (req, res) => {
   const saved = store.saveSettings({ hotlink: (req.body || {}).hotlink });
   res.json(saved);
+});
+
+// ============ 用户管理（仅超级管理员） ============
+app.get('/api/admin/users', auth.requireSuper, (req, res) => res.json(users.listUsers()));
+
+app.post('/api/admin/users', auth.requireSuper, (req, res) => {
+  const { username, password, role } = req.body || {};
+  if (!username || !password) return res.status(400).json({ error: '用户名与密码必填' });
+  try {
+    const u = users.createUser({ username, password, role, createdBy: req.user.username });
+    res.status(201).json(u);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/users/:id', auth.requireSuper, (req, res) => {
+  const { password, role, enabled } = req.body || {};
+  // 不允许把「最后一个启用的超级管理员」降级或禁用
+  if (role || enabled === false) {
+    const list = users.listUsers();
+    const target = list.find((u) => u.id === req.params.id);
+    const supers = list.filter((u) => u.role === 'super' && u.enabled);
+    if (target && target.role === 'super' && supers.length <= 1) {
+      if (role && role !== 'super') return res.status(409).json({ error: '不能降级最后一个超级管理员' });
+      if (enabled === false) return res.status(409).json({ error: '不能禁用最后一个超级管理员' });
+    }
+  }
+  try {
+    const u = users.updateUser(req.params.id, { password, role, enabled });
+    if (!u) return res.status(404).json({ error: 'not found' });
+    res.json(u);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.delete('/api/admin/users/:id', auth.requireSuper, (req, res) => {
+  const target = users.getUserById(req.params.id);
+  if (!target) return res.status(404).json({ error: 'not found' });
+  if (target.username === req.user.username) {
+    return res.status(400).json({ error: '不能删除自己的账号' });
+  }
+  const list = users.listUsers();
+  if (target.role === 'super' && list.filter((u) => u.role === 'super' && u.enabled).length <= 1) {
+    return res.status(409).json({ error: '不能删除最后一个超级管理员' });
+  }
+  users.deleteUser(req.params.id);
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/users/:id/regenerate-token', auth.requireSuper, (req, res) => {
+  const u = users.updateUser(req.params.id, { apiToken: crypto.randomBytes(18).toString('hex') });
+  if (!u) return res.status(404).json({ error: 'not found' });
+  res.json({ apiToken: u.apiToken });
 });
 
 // ============ 页面 ============

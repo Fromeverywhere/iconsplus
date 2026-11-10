@@ -19,8 +19,13 @@
       <input id="searchInput" type="search" placeholder="搜索图标…" aria-label="搜索图标" />
     </div>
     <div class="actions">
+      <a id="accountChip" class="account-chip hidden" href="/admin" title="进入我的后台">
+        <span class="avatar" id="accountAvatar">U</span>
+        <span class="account-name" id="accountName"></span>
+        <span class="role-badge" id="accountRole"></span>
+      </a>
       <button id="submitBtn" class="btn btn-primary">提交图标</button>
-      <a id="adminLink" class="btn btn-ghost" href="/admin">管理</a>
+      <a id="adminLink" class="btn btn-ghost" href="/admin">登录</a>
       <button id="themeToggle" class="btn btn-icon" title="切换主题" aria-label="切换主题">
         <span class="theme-sun">☀</span><span class="theme-moon">☾</span>
       </button>
@@ -66,7 +71,7 @@
     <div class="modal-card">
       <button class="modal-close" id="submitClose" aria-label="关闭">×</button>
       <h2>提交图标源</h2>
-      <p class="muted">填写你的网站与图标接口，审核通过后即可将图标收录进 icons+。</p>
+      <p class="muted">填写你的网站与图标接口，审核通过后即可将图标收录进 icons+。需以「上传+调用」或「超级管理员」身份登录。</p>
       <form id="submitForm" class="form">
         <label>站点名称 *<input name="siteName" required maxlength="60" placeholder="如 MyIcons" /></label>
         <label>站点网址 *<input name="siteUrl" required type="url" placeholder="https://example.com" /></label>
