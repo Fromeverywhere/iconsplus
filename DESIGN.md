@@ -95,6 +95,20 @@ docker compose up -d --build   # 端口 28080 -> 5000，镜像名 iconsplus:dev
 - Referer 防盗链仍为弱防护（可被伪造 Referer 绕过），黑名单/白名单用于阻断已知盗链站；严格场景建议升级签名 token。
 
 ## 9. v0.3 角色权限与 UI 优化
+
+## 10. v0.3.1 UI 重构（2026-11-12，按 modern-web-guidance 最佳实践）
+- 主题：`<meta name="color-scheme" content="light dark">` + 头部内联脚本回放 localStorage 覆盖值防 FOUC；
+  `:root` 声明 `color-scheme: light dark`，手动覆盖经 `:root:has(> head > meta[...])` 映射回 CSS；
+  设计令牌用 `light-dark()` 定义（`@supports` 门控 + `prefers-color-scheme` 兜底），
+  `accent-color` 统一原生控件；主题切换为两态控件（system↔override，共享 `static/theme.js`，CSS 不依赖 JS）。
+- 模态：图库预览/提交、后台详情全部改用原生 `<dialog>` + `showModal()`（浏览器内建焦点圈定、Esc、
+  `::backdrop`、顶层渲染），`overscroll-behavior: contain` 阻断滚动穿透（不用 body overflow 锁）；
+  进出场用 `@starting-style` + `transition-behavior: allow-discrete`（仅 opacity/translate/scale）。
+- 动效：仅合成器友好属性；`prefers-reduced-motion` 分案处理（卡片位移、脉冲动画仅在 no-preference 启用）。
+- 语义与可达性：图标卡片改原生 `<button>`、侧栏分类 `li>button[aria-pressed]`、后台页签 `button[role=tab]`、
+  全局 `:focus-visible` ring、`text-wrap: balance`、rem 字号、按钮不设固定高度。
+- 剪贴板：Async Clipboard + `execCommand` 回退（NAS http 部署为非安全上下文，原生 API 必失败）。
+- 映射红线（`/images/<分类>/<文件>`）与全部 API 未动；版本 0.3 → 0.3.1。
 把「用户权限」从一个管理员扩展为三档角色，并据此重做后台 UI：
 
 ### 9.1 角色模型

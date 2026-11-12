@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <script>try { document.querySelector('meta[name="color-scheme"]').content = localStorage.getItem('icons_theme') || 'light dark'; } catch (e) {}</script>
   <meta name="description" content="icons+ 图标托管：分类图标、外链加速、提交共建。" />
   <title>icons+</title>
   <link id="faviconLink" rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
-<body data-theme="light">
+<body>
   <header class="topbar">
     <div class="brand">
       <img id="siteLogo" src="/static/favicon.svg" alt="logo" class="brand-logo" />
@@ -27,7 +29,7 @@
       <button id="submitBtn" class="btn btn-primary">提交图标</button>
       <a id="adminLink" class="btn btn-ghost" href="/admin">登录</a>
       <button id="themeToggle" class="btn btn-icon" title="切换主题" aria-label="切换主题">
-        <span class="theme-sun">☀</span><span class="theme-moon">☾</span>
+        <span class="theme-sun" aria-hidden="true">☀</span><span class="theme-moon" aria-hidden="true">☾</span>
       </button>
     </div>
   </header>
@@ -49,47 +51,44 @@
     </main>
   </div>
 
-  <!-- 预览弹窗 -->
-  <div id="previewModal" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-card">
-      <button class="modal-close" id="previewClose" aria-label="关闭">×</button>
-      <div class="preview-img-wrap"><img id="previewImg" alt="preview" /></div>
-      <div class="preview-meta">
-        <div id="previewName" class="preview-name"></div>
-        <code id="previewUrl" class="preview-url"></code>
-        <div class="preview-actions">
-          <button class="btn btn-primary" id="copyLink">复制链接</button>
-          <a class="btn btn-ghost" id="downloadLink" download>下载</a>
-          <a class="btn btn-ghost" id="openLink" target="_blank" rel="noopener">新窗口打开</a>
-        </div>
+  <!-- 预览（原生 dialog：焦点圈定、Esc、::backdrop、顶层渲染均为浏览器内建） -->
+  <dialog id="previewModal" class="modal-card" aria-labelledby="previewName">
+    <button class="modal-close" id="previewClose" aria-label="关闭" autofocus>×</button>
+    <div class="preview-img-wrap"><img id="previewImg" alt="" /></div>
+    <div class="preview-meta">
+      <h2 id="previewName" class="preview-name"></h2>
+      <code id="previewUrl" class="preview-url"></code>
+      <div class="preview-actions">
+        <button type="button" class="btn btn-primary" id="copyLink">复制链接</button>
+        <a class="btn btn-ghost" id="downloadLink" download>下载</a>
+        <a class="btn btn-ghost" id="openLink" target="_blank" rel="noopener">新窗口打开</a>
       </div>
     </div>
-  </div>
+  </dialog>
 
-  <!-- 提交弹窗 -->
-  <div id="submitModal" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-card">
-      <button class="modal-close" id="submitClose" aria-label="关闭">×</button>
-      <h2>提交图标源</h2>
-      <p class="muted">填写你的网站与图标接口，审核通过后即可将图标收录进 icons+。需以「上传+调用」或「超级管理员」身份登录。</p>
-      <form id="submitForm" class="form">
-        <label>站点名称 *<input name="siteName" required maxlength="60" placeholder="如 MyIcons" /></label>
-        <label>站点网址 *<input name="siteUrl" required type="url" placeholder="https://example.com" /></label>
-        <label>图标接口 *<input name="apiUrl" required type="url" placeholder="https://example.com/api/icons" /></label>
-        <label>联系方式<input name="contact" maxlength="120" placeholder="邮箱 / 主页（选填）" /></label>
-        <label>备注<textarea name="note" rows="3" maxlength="300" placeholder="选填"></textarea></label>
-        <p class="form-hint">接口需返回 JSON：<code>{ "category": "可选", "icons": [ { "name": "xx", "url": "https://…/x.png" } ] }</code></p>
-        <div id="submitMsg" class="form-msg"></div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-ghost" id="submitCancel">取消</button>
-          <button type="submit" class="btn btn-primary">提交审核</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <!-- 提交 -->
+  <dialog id="submitModal" class="modal-card" aria-labelledby="submitTitle">
+    <button class="modal-close" id="submitClose" aria-label="关闭" autofocus>×</button>
+    <h2 id="submitTitle">提交图标源</h2>
+    <p class="muted">填写你的网站与图标接口，审核通过后即可将图标收录进 icons+。需以「上传+调用」或「超级管理员」身份登录。</p>
+    <form id="submitForm" class="form">
+      <label>站点名称 *<input name="siteName" required maxlength="60" placeholder="如 MyIcons" /></label>
+      <label>站点网址 *<input name="siteUrl" required type="url" placeholder="https://example.com" /></label>
+      <label>图标接口 *<input name="apiUrl" required type="url" placeholder="https://example.com/api/icons" /></label>
+      <label>联系方式<input name="contact" maxlength="120" placeholder="邮箱 / 主页（选填）" /></label>
+      <label>备注<textarea name="note" rows="3" maxlength="300" placeholder="选填"></textarea></label>
+      <p class="form-hint">接口需返回 JSON：<code>{ "category": "可选", "icons": [ { "name": "xx", "url": "https://…/x.png" } ] }</code></p>
+      <div id="submitMsg" class="form-msg"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" id="submitCancel">取消</button>
+        <button type="submit" class="btn btn-primary">提交审核</button>
+      </div>
+    </form>
+  </dialog>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
+  <script src="/static/theme.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

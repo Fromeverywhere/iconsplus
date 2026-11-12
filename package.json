@@ -1,6 +1,6 @@
 {
   "name": "iconsplus",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "icons+ 图标托管：分类图标、外链加速、提交共建、后台审核与防盗链。基于 xg-icons-hub 构建。",
   "main": "server/index.js",
   "scripts": {

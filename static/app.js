@@ -83,9 +83,13 @@
     categoryList.innerHTML = '';
     items.forEach((it) => {
       const li = document.createElement('li');
-      li.className = (it.name === activeCat ? 'active' : '');
-      li.innerHTML = '<span>' + escapeHtml(it.label) + '</span><span class="count">' + it.count + '</span>';
-      li.onclick = () => { activeCat = it.name; renderCategories(); renderGrid(); };
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cat-item' + (it.name === activeCat ? ' active' : '');
+      btn.setAttribute('aria-pressed', it.name === activeCat ? 'true' : 'false');
+      btn.innerHTML = '<span>' + escapeHtml(it.label) + '</span><span class="count">' + it.count + '</span>';
+      btn.onclick = () => { activeCat = it.name; renderCategories(); renderGrid(); };
+      li.appendChild(btn);
       categoryList.appendChild(li);
     });
   }
@@ -109,40 +113,48 @@
     resultSummary.textContent = '共 ' + list.length + ' 个图标';
     grid.innerHTML = '';
     emptyState.classList.toggle('hidden', list.length > 0);
+    const frag = document.createDocumentFragment();
     list.forEach((i) => {
-      const card = document.createElement('div');
+      // 可点击卡片用原生 button：键盘可达、语义正确
+      const card = document.createElement('button');
+      card.type = 'button';
       card.className = 'card';
+      card.setAttribute('aria-label', '预览 ' + i.file);
       const img = document.createElement('img');
       img.loading = 'lazy';
       img.src = thumbUrl(i.cat, i.file);
-      img.alt = i.file;
+      img.alt = '';
       img.onerror = function () {
         if (this.src !== iconUrl(i.cat, i.file)) this.src = iconUrl(i.cat, i.file);
         else this.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22/%3E';
       };
-      const name = document.createElement('div');
+      const name = document.createElement('span');
       name.className = 'name';
       name.textContent = i.file;
       card.appendChild(img);
       card.appendChild(name);
       card.onclick = () => openPreview(i.cat, i.file);
-      grid.appendChild(card);
+      frag.appendChild(card);
     });
+    grid.appendChild(frag);
   }
 
-  // ---------- 预览 ----------
+  // ---------- 预览（原生 dialog） ----------
   function openPreview(cat, file) {
     const url = iconUrl(cat, file);
-    $('#previewImg').src = url;
+    const img = $('#previewImg');
+    img.src = url;
+    img.alt = file;
     $('#previewName').textContent = file;
     $('#previewUrl').textContent = location.origin + url;
     $('#downloadLink').href = url;
     $('#openLink').href = url;
     $('#copyLink').onclick = () => copyText(location.origin + url);
-    previewModal.classList.remove('hidden');
+    previewModal.showModal();
   }
-  $('#previewClose').onclick = () => previewModal.classList.add('hidden');
-  previewModal.onclick = (e) => { if (e.target === previewModal) previewModal.classList.add('hidden'); };
+  $('#previewClose').onclick = () => previewModal.close();
+  // 点击 ::backdrop（即 dialog 自身区域）关闭
+  previewModal.addEventListener('click', (e) => { if (e.target === previewModal) previewModal.close(); });
 
   // ---------- 提交 ----------
   $('#submitBtn').onclick = () => {
@@ -155,11 +167,11 @@
       toast('你的角色（仅调用）无法提交图标');
       return;
     }
-    submitModal.classList.remove('hidden');
+    submitModal.showModal();
   };
-  $('#submitClose').onclick = () => submitModal.classList.add('hidden');
-  $('#submitCancel').onclick = () => submitModal.classList.add('hidden');
-  submitModal.onclick = (e) => { if (e.target === submitModal) submitModal.classList.add('hidden'); };
+  $('#submitClose').onclick = () => submitModal.close();
+  $('#submitCancel').onclick = () => submitModal.close();
+  submitModal.addEventListener('click', (e) => { if (e.target === submitModal) submitModal.close(); });
 
   $('#submitForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -177,15 +189,30 @@
       if (!r.ok) { msg.className = 'form-msg err'; msg.textContent = data.error || '提交失败'; return; }
       msg.className = 'form-msg ok'; msg.textContent = '已提交，等待管理员审核（ID: ' + data.id.slice(0, 8) + '）';
       e.target.reset();
-      setTimeout(() => submitModal.classList.add('hidden'), 1500);
+      setTimeout(() => { if (submitModal.open) submitModal.close(); }, 1500);
     } catch (err) {
       msg.className = 'form-msg err'; msg.textContent = '网络错误，请重试';
     }
   });
 
   // ---------- 工具 ----------
-  function copyText(text) {
-    navigator.clipboard?.writeText(text).then(() => toast('已复制链接'));
+  // 剪贴板：Async Clipboard 仅在安全上下文可用（NAS 部署常为 http），失败时回退 execCommand
+  function legacyCopy(text) {
+    const field = Object.assign(document.createElement('textarea'), { value: text });
+    field.setAttribute('readonly', '');
+    field.style.cssText = 'position:fixed;top:0;opacity:0';
+    document.body.append(field);
+    field.select();
+    try { return document.execCommand('copy'); } finally { field.remove(); }
+  }
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('已复制');
+    } catch (_) {
+      if (legacyCopy(text)) toast('已复制');
+      else toast('复制失败，请手动复制');
+    }
   }
   let toastTimer;
   function toast(text) {
@@ -198,19 +225,7 @@
 
   searchInput.addEventListener('input', (e) => { keyword = e.target.value.trim(); renderGrid(); });
 
-  // 主题
-  const savedTheme = localStorage.getItem('icons_theme');
-  if (savedTheme) document.body.setAttribute('data-theme', savedTheme);
-  $('#themeToggle').onclick = () => {
-    const next = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    document.body.setAttribute('data-theme', next);
-    localStorage.setItem('icons_theme', next);
-  };
-
-  // Esc 关闭弹窗
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { previewModal.classList.add('hidden'); submitModal.classList.add('hidden'); }
-  });
+  // 主题由共享的 theme.js 管理（system/light/dark 三态，localStorage 持久化）
 
   // 启动
   loadConfig().then(loadMe).then(loadIcons);

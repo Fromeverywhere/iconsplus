@@ -169,9 +169,11 @@
     const d = r.ok ? await r.json() : {};
     $('#detailTitle').textContent = d.siteName || id;
     $('#detailBody').textContent = JSON.stringify(d, null, 2);
-    $('#detailModal').classList.remove('hidden');
+    const dlg = $('#detailModal');
+    dlg.showModal();
   }
-  $('#detailClose').onclick = () => $('#detailModal').classList.add('hidden');
+  $('#detailClose').onclick = () => $('#detailModal').close();
+  $('#detailModal').addEventListener('click', (e) => { if (e.target === $('#detailModal')) $('#detailModal').close(); });
 
   $('#statusFilters').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-status]'); if (!b) return;
@@ -342,9 +344,27 @@
     const d = r.ok ? await r.json() : {};
     $('#myToken').textContent = d.apiToken || '—';
   }
+  // 剪贴板：http 部署（NAS）下 Async Clipboard 不可用，需 execCommand 回退
+  function legacyCopy(text) {
+    const field = Object.assign(document.createElement('textarea'), { value: text });
+    field.setAttribute('readonly', '');
+    field.style.cssText = 'position:fixed;top:0;opacity:0';
+    document.body.append(field);
+    field.select();
+    try { return document.execCommand('copy'); } finally { field.remove(); }
+  }
+  async function copyText(text, okMsg) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(okMsg || '已复制');
+    } catch (_) {
+      if (legacyCopy(text)) toast(okMsg || '已复制');
+      else toast('复制失败，请手动复制');
+    }
+  }
   $('#copyToken').onclick = () => {
     const t = $('#myToken').textContent;
-    if (t && t !== '—') { navigator.clipboard?.writeText(t).then(() => toast('Token 已复制')); }
+    if (t && t !== '—') copyText(t, 'Token 已复制');
   };
 
   // ---------- utils ----------

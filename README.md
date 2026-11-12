@@ -4,6 +4,11 @@
 
 ## 功能
 - 🖼️ 分类图标图库（重构 UI，但对外 URL 与 xg-icons-hub 完全一致：`/images/<分类>/<文件>`）
+- 🎨 现代化 UI（0.3.1，按 modern-web-guidance 最佳实践重构）：
+  `color-scheme` + `light-dark()` 明暗主题（跟随系统、可手动切换、无 FOUC）、
+  原生 `<dialog>` 模态（焦点圈定 / Esc / `::backdrop` 内建）、
+  `@starting-style` 进出场动画、`prefers-reduced-motion` 适配、
+  键盘可达（`focus-visible`、语义化按钮卡片）、http 环境剪贴板回退
 - ⚡ 缩略图加速（sharp 自动生成，缺图回退原图，不污染图标库）
 - 🔐 管理后台：默认 `admin` / `iconsplus`
 - 👥 三档角色权限：**超级管理员** / **上传+调用** / **仅调用**（含用户管理、个人 API Token）
