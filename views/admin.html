@@ -111,6 +111,42 @@
       border: 1px solid var(--border);
     }
     h3.section-title { margin: 0 0 4px; font-size: 0.9375rem; }
+    /* 分类管理 / 使用手册 */
+    .cat-label-input {
+      border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px;
+      font-size: 0.8125rem; background: var(--surface-2); color: var(--text);
+      outline: none; font-family: inherit; width: 160px; max-width: 100%;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .cat-label-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 18%, transparent);
+    }
+    .cat-images-card { max-width: min(720px, 92vw); }
+    .cat-images-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 10px; max-height: 60vh; overflow: auto; padding: 2px;
+    }
+    .cat-img-item {
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 8px; display: flex; flex-direction: column;
+      align-items: center; gap: 6px; text-align: center;
+    }
+    .cat-img-item img { width: 40px; height: 40px; object-fit: contain; }
+    .cat-img-item .fname { font-size: 0.6875rem; word-break: break-all; line-height: 1.3; max-height: 2.6em; overflow: hidden; }
+    .cat-img-item .btn { padding: 4px 8px; font-size: 0.6875rem; min-block-size: 24px; }
+    .help-doc { max-width: 760px; }
+    .help-doc .section-title { margin: 18px 0 8px; }
+    .help-doc .section-title:first-child { margin-top: 0; }
+    .help-steps, .help-list {
+      margin: 0 0 8px; padding-left: 22px; font-size: 0.8438rem;
+      line-height: 1.8; color: var(--text);
+    }
+    .help-list li::marker { color: var(--primary); }
+    .help-doc code {
+      background: var(--surface-2); padding: 1px 6px; border-radius: 5px;
+      font-size: 0.75rem; word-break: break-all;
+    }
   </style>
 </head>
 <body>
@@ -155,10 +191,12 @@
 
     <div class="tabs" id="tabs" role="tablist" aria-label="后台功能">
       <button type="button" class="tab" data-tab="review" data-roles="super" role="tab">审核队列</button>
+      <button type="button" class="tab" data-tab="cats" data-roles="super" role="tab">分类管理</button>
       <button type="button" class="tab" data-tab="mine" data-roles="super,uploader" role="tab">我的提交</button>
       <button type="button" class="tab" data-tab="settings" data-roles="super" role="tab">防盗链设置</button>
       <button type="button" class="tab" data-tab="users" data-roles="super" role="tab">用户管理</button>
       <button type="button" class="tab" data-tab="api" data-roles="super,uploader,viewer" role="tab">API 调用</button>
+      <button type="button" class="tab" data-tab="help" data-roles="super,uploader,viewer" role="tab">使用手册</button>
     </div>
 
     <!-- 审核队列（super） -->
@@ -173,6 +211,20 @@
         <table>
           <thead><tr><th>站点</th><th>网址</th><th>接口</th><th>状态</th><th>提交人</th><th>时间</th><th>操作</th></tr></thead>
           <tbody id="subsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 分类管理（super） -->
+    <section id="panel-cats" class="panel">
+      <p class="muted" style="margin:0 0 14px">
+        <b>显示名</b>只影响前台展示，可随意用中文命名；<b>文件夹名</b>是图片目录名，也是外链 URL 的一部分
+        （<code>/images/&lt;文件夹名&gt;/&lt;文件&gt;</code>）。重命名文件夹后<b>旧外链会立即失效</b>，需要更新引用。
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>文件夹名（URL 用）</th><th>显示名</th><th>图标数</th><th>操作</th></tr></thead>
+          <tbody id="catsBody"></tbody>
         </table>
       </div>
     </section>
@@ -269,9 +321,68 @@
         </div>
       </div>
     </section>
+
+    <!-- 使用手册（所有人） -->
+    <section id="panel-help" class="panel">
+      <div class="help-doc">
+        <h3 class="section-title">🚀 快速起步</h3>
+        <ol class="help-steps">
+          <li>首次部署后用默认账号登录：<code>admin / iconsplus</code>（<b>登录后立即在「用户管理」改密码</b>）。</li>
+          <li>在「用户管理」给家人/朋友建账号：管理员用 <b>超级管理员</b>；只帮忙提交图标的用 <b>上传+调用</b>；只取用图标的用 <b>仅调用</b>。</li>
+          <li>往 <code>images/</code> 下建文件夹（文件夹名就是分类），把图标文件丢进去即可，前台自动出现。</li>
+          <li>想用中文分类名？去「分类管理」改<b>显示名</b>，文件夹名保持英文更稳。</li>
+        </ol>
+
+        <h3 class="section-title">🗂️ 分类管理（超级管理员）</h3>
+        <ul class="help-list">
+          <li><b>改显示名</b>：只改前台展示的文字，<b>不影响外链</b>，随时可改。</li>
+          <li><b>重命名文件夹</b>：会移动磁盘目录和缩略图，外链 URL 从此变成
+            <code>/images/&lt;新文件夹名&gt;/&lt;文件&gt;</code>，<b>旧链接立即 404</b>。已在 Docker/导航站里引用过的，改完要同步更新。</li>
+          <li><b>管理图片</b>：点「管理图片」可查看该分类下所有图标并删除。删除<b>不可恢复</b>，操作前想清楚。</li>
+          <li>文件夹名规则：中文、字母、数字、中划线、下划线；不能以点开头，不能重名。</li>
+          <li>也可以不走后台：直接在宿主机 <code>images/</code> 目录里增删文件夹和文件，服务会自动识别（缩略图会自动对账）。</li>
+        </ul>
+
+        <h3 class="section-title">📥 提交与审核</h3>
+        <ul class="help-list">
+          <li>前台「提交图标」或后台「我的提交」：填站点名称、站点网址、<b>图标接口</b>（返回 JSON 的 URL）。</li>
+          <li>接口格式：<code>{ "category": "可选分类", "icons": [ { "name": "xx", "url": "https://…/x.png" } ] }</code></li>
+          <li>超级管理员在「审核队列」点「通过」→ 后台自动拉取图标入库（异步，可关页面）。拒绝可填原因。</li>
+          <li>同一站点/接口在待审、导入中、已通过状态下不可重复提交。</li>
+        </ul>
+
+        <h3 class="section-title">🔗 外链与 API</h3>
+        <ul class="help-list">
+          <li>图标直链（<b>映射红线，永不改变</b>）：<code>/images/&lt;分类文件夹名&gt;/&lt;文件名&gt;</code></li>
+          <li>列表接口（公开）：<code>/api/icons.json</code>，返回 <code>[{ name: 文件夹名, label: 显示名, icons: [...] }]</code></li>
+          <li>缩略图加速：<code>/thumbs/…</code> 自动生成 webp，缺失自动回退原图；前端无需关心。</li>
+          <li>程序化提交：带 <code>Authorization: Bearer &lt;Token&gt;</code> 调 <code>POST /api/submissions</code>，Token 在「API 调用」页签。</li>
+          <li>如果你在外部引用了 <code>/api/icons.json</code> 做导航站数据源：新增了 <code>label</code> 字段用于展示，<code>name</code> 字段含义不变，旧代码兼容。</li>
+        </ul>
+
+        <h3 class="section-title">🛡️ 防盗链</h3>
+        <ul class="help-list">
+          <li>「防盗链设置」里开启后按 Referer 校验：白名单按 host 后缀匹配（填 <code>example.com</code> 则其子域也放行）。</li>
+          <li>黑名单优先级更高；「允许空 Referer」建议开着，否则浏览器直接打开图片链接会被拒。</li>
+        </ul>
+
+        <h3 class="section-title">⚠️ 注意事项</h3>
+        <ul class="help-list">
+          <li>图片目录 <code>images/</code> 通常挂载在宿主机（如飞牛 <code>/vol1/1000/Docker/images</code>），容器升级重建<b>不会丢图</b>；但 <code>data/</code>（账号、提交记录、分类显示名）也请一并挂载持久化。</li>
+          <li>改 Docker 镜像版本不影响图片与数据；升级前备份这两个目录更稳妥。</li>
+          <li>删除图片/重命名文件夹都没有二次恢复机制，重要图库请定期备份 <code>images/</code>。</li>
+        </ul>
+      </div>
+    </section>
   </div>
 
-  <!-- 详情（原生 dialog） -->
+  <!-- 分类图片管理（原生 dialog） -->
+  <dialog id="catImagesModal" class="modal-card cat-images-card" aria-labelledby="catImagesTitle">
+    <button class="modal-close" id="catImagesClose" aria-label="关闭" autofocus>×</button>
+    <h2 id="catImagesTitle"></h2>
+    <p class="muted" style="font-size:0.8125rem;margin:4px 0 12px">删除操作不可恢复，请谨慎确认。</p>
+    <div id="catImagesGrid" class="cat-images-grid"></div>
+  </dialog>
   <dialog id="detailModal" class="modal-card" aria-labelledby="detailTitle">
     <button class="modal-close" id="detailClose" aria-label="关闭" autofocus>×</button>
     <h2 id="detailTitle"></h2>

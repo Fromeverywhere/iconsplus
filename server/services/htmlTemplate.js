@@ -12,9 +12,12 @@ function normalizeAsset(val, defaultName = 'favicon.ico') {
     if (/^https?:\/\//.test(asset)) {
         return asset;
     }
-    // Special case for default 'favicon.ico' -> map to /static/favicon.ico
+    // Special cases for bundled defaults -> map to /static/<name>
     if (asset === defaultName) {
         return '/static/favicon.ico';
+    }
+    if (asset === 'favicon.svg') {
+        return '/static/favicon.svg';
     }
     // Ensure it starts with /
     return asset.startsWith('/') ? asset : `/${asset}`;

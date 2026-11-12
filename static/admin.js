@@ -75,6 +75,7 @@
     document.querySelectorAll('#tabs .tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
     document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'panel-' + name));
     if (name === 'review') loadReview();
+    else if (name === 'cats') loadCats();
     else if (name === 'mine') loadMine();
     else if (name === 'settings') loadSettings();
     else if (name === 'users') loadUsers();
@@ -181,6 +182,114 @@
     [...e.currentTarget.children].forEach((c) => c.classList.toggle('active', c === b));
     loadReview();
   });
+
+  // ---------- 分类管理（super） ----------
+  async function loadCats() {
+    const r = await api('/api/admin/categories');
+    const list = r.ok ? await r.json() : [];
+    const body = $('#catsBody');
+    body.innerHTML = '';
+    if (!list.length) { body.innerHTML = '<tr><td colspan="4" class="muted">images 目录下还没有分类文件夹</td></tr>'; return; }
+    list.forEach((c) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><code>' + esc(c.folder) + '</code></td>' +
+        '<td><input class="cat-label-input" value="' + esc(c.label) + '" maxlength="40" ' +
+          'aria-label="显示名" data-folder="' + esc(c.folder) + '" placeholder="前台展示名" /></td>' +
+        '<td>' + c.count + '</td>' +
+        '<td><div class="row-actions">' +
+          '<button class="btn btn-primary" data-act="save-label" data-folder="' + esc(c.folder) + '">保存</button>' +
+          '<button class="btn" data-act="manage" data-folder="' + esc(c.folder) + '">管理图片</button>' +
+          '<button class="btn" data-act="rename" data-folder="' + esc(c.folder) + '">重命名文件夹</button>' +
+        '</div></td>';
+      body.appendChild(tr);
+    });
+  }
+
+  $('#catsBody').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const folder = btn.dataset.folder;
+    const act = btn.dataset.act;
+    if (act === 'save-label') {
+      const input = $('#catsBody input[data-folder="' + folder + '"]');
+      const r = await api('/api/admin/categories/' + encodeURIComponent(folder) + '/label', {
+        method: 'PUT', body: JSON.stringify({ label: input.value })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { toast('显示名已更新：' + d.label); loadCats(); }
+      else toast('失败：' + (d.error || '未知错误'));
+    } else if (act === 'manage') {
+      return openCatImages(folder);
+    } else if (act === 'rename') {
+      const newName = (prompt('新的文件夹名（中文/字母/数字/中划线/下划线）：\n注意：外链 URL 会随之变化，旧链接将 404。', folder) || '').trim();
+      if (!newName || newName === folder) return;
+      if (!confirm('确认把文件夹「' + folder + '」重命名为「' + newName + '」？\n已发布的外链需要同步更新。')) return;
+      const r = await api('/api/admin/categories/' + encodeURIComponent(folder) + '/rename', {
+        method: 'PUT', body: JSON.stringify({ newName })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { toast('已重命名为「' + d.folder + '」'); loadCats(); if (state.user.role === 'super') loadStats(); }
+      else toast('失败：' + (d.error || '未知错误'));
+    }
+  });
+
+  // 显示名输入框回车即保存
+  $('#catsBody').addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter' || !e.target.matches('.cat-label-input')) return;
+    e.preventDefault();
+    const folder = e.target.dataset.folder;
+    const r = await api('/api/admin/categories/' + encodeURIComponent(folder) + '/label', {
+      method: 'PUT', body: JSON.stringify({ label: e.target.value })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) { toast('显示名已更新：' + d.label); loadCats(); }
+    else toast('失败：' + (d.error || '未知错误'));
+  });
+
+  async function openCatImages(folder) {
+    const dlg = $('#catImagesModal');
+    $('#catImagesTitle').textContent = '分类图片：' + folder;
+    const grid = $('#catImagesGrid');
+    grid.innerHTML = '<span class="muted">加载中…</span>';
+    dlg.showModal();
+    const r = await api('/api/icons.json');
+    const cats = r.ok ? await r.json() : [];
+    const cat = cats.find((c) => c.name === folder);
+    grid.innerHTML = '';
+    if (!cat || !cat.icons.length) {
+      grid.innerHTML = '<span class="muted">该分类暂无图片</span>';
+      return;
+    }
+    cat.icons.forEach((file) => {
+      const item = document.createElement('div');
+      item.className = 'cat-img-item';
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.alt = '';
+      img.src = '/thumbs/' + encodeURIComponent(folder) + '/' + encodeURIComponent(file) + '.webp';
+      img.onerror = function () { this.src = '/images/' + encodeURIComponent(folder) + '/' + encodeURIComponent(file); };
+      const name = document.createElement('span');
+      name.className = 'fname';
+      name.textContent = file;
+      name.title = file;
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'btn';
+      del.textContent = '删除';
+      del.onclick = async () => {
+        if (!confirm('确定删除 ' + folder + '/' + file + '？\n此操作不可恢复，引用该图的外链将 404。')) return;
+        const rr = await api('/api/admin/categories/' + encodeURIComponent(folder) + '/icons/' + encodeURIComponent(file), { method: 'DELETE' });
+        const dd = await rr.json().catch(() => ({}));
+        if (rr.ok) { item.remove(); toast('已删除 ' + file); loadCats(); }
+        else toast('删除失败：' + (dd.error || '未知错误'));
+      };
+      item.append(img, name, del);
+      grid.appendChild(item);
+    });
+  }
+  $('#catImagesClose').onclick = () => $('#catImagesModal').close();
+  $('#catImagesModal').addEventListener('click', (e) => { if (e.target === $('#catImagesModal')) $('#catImagesModal').close(); });
 
   // ---------- 我的提交（super/uploader） ----------
   async function loadMine() {

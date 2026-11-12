@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const categories = require('./categories');
 
 const IMAGES_DIR = path.join(__dirname, '../../images');
 
@@ -37,11 +38,19 @@ function getIcons() {
         return [];
     }
 
-    const categories = fs.readdirSync(IMAGES_DIR, { withFileTypes: true })
+    const dirs = fs.readdirSync(IMAGES_DIR, { withFileTypes: true })
         .filter(dirent => dirent.isDirectory() && !dirent.name.startsWith('.'))
         .map(dirent => dirent.name);
 
-    const result = categories.map(category => {
+    // 分类显示名与文件夹名解耦：文件夹名 = URL 键（name），label = 后台可配置的展示名
+    let meta = {};
+    try {
+        meta = categories.readMap();
+    } catch (_) {
+        meta = {};
+    }
+
+    const result = dirs.map(category => {
         const categoryPath = path.join(IMAGES_DIR, category);
         const files = fs.readdirSync(categoryPath)
             .filter(file => {
@@ -50,11 +59,16 @@ function getIcons() {
             })
             .sort(customSort);
 
+        const m = meta[category] || {};
         return {
             name: category,
+            label: (typeof m.label === 'string' && m.label.trim()) || category,
             icons: files
         };
     }).filter(cat => cat.icons.length > 0); // Optional: filter out empty categories
+
+    // 显示名排序（中文按拼音/locale），纯文件夹名作为次级稳定键
+    result.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN', { numeric: true }) || a.name.localeCompare(b.name));
 
     return result;
 }

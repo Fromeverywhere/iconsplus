@@ -76,10 +76,15 @@
   }
 
   // ---------- 渲染 ----------
+  function catLabel(name) {
+    const c = CATEGORIES.find((x) => x.name === name);
+    return (c && c.label) || name;
+  }
+
   function renderCategories() {
     const total = CATEGORIES.reduce((n, c) => n + c.icons.length, 0);
     const items = [{ name: 'all', label: '全部', count: total }]
-      .concat(CATEGORIES.map((c) => ({ name: c.name, label: c.name, count: c.icons.length })));
+      .concat(CATEGORIES.map((c) => ({ name: c.name, label: c.label || c.name, count: c.icons.length })));
     categoryList.innerHTML = '';
     items.forEach((it) => {
       const li = document.createElement('li');
@@ -98,18 +103,18 @@
     let list = [];
     CATEGORIES.forEach((c) => {
       if (activeCat !== 'all' && c.name !== activeCat) return;
-      c.icons.forEach((file) => list.push({ cat: c.name, file }));
+      c.icons.forEach((file) => list.push({ cat: c.name, label: c.label || c.name, file }));
     });
     if (keyword) {
       const k = keyword.toLowerCase();
-      list = list.filter((i) => (i.cat + '/' + i.file).toLowerCase().includes(k));
+      list = list.filter((i) => (i.cat + '/' + i.label + '/' + i.file).toLowerCase().includes(k));
     }
     return list;
   }
 
   function renderGrid() {
     const list = currentIcons();
-    currentView.textContent = activeCat === 'all' ? '全部图标' : activeCat;
+    currentView.textContent = activeCat === 'all' ? '全部图标' : catLabel(activeCat);
     resultSummary.textContent = '共 ' + list.length + ' 个图标';
     grid.innerHTML = '';
     emptyState.classList.toggle('hidden', list.length > 0);

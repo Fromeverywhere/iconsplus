@@ -3,7 +3,10 @@
 可共建的图标托管平台。在 [xg-icons-hub](https://github.com/verkyer/xg-icons-hub) 基础上扩展，新增**管理后台、角色权限、用户提交审核、防盗链**。
 
 ## 功能
-- 🖼️ 分类图标图库（重构 UI，但对外 URL 与 xg-icons-hub 完全一致：`/images/<分类>/<文件>`）
+- 🖼️ 分类图标图库（对外 URL 与 xg-icons-hub 完全一致：`/images/<分类>/<文件>`）
+- 🗂️ 分类显示名与文件夹名解耦（0.4.0）：后台可改中文显示名、重命名文件夹、管理分类内图片；
+  `/api/icons.json` 新增 `label` 字段（展示用），`name` 字段含义不变，旧调用方兼容
+- 📖 后台内置「使用手册」页签（0.4.0），起步操作一目了然
 - 🎨 现代化 UI（0.3.1，按 modern-web-guidance 最佳实践重构）：
   `color-scheme` + `light-dark()` 明暗主题（跟随系统、可手动切换、无 FOUC）、
   原生 `<dialog>` 模态（焦点圈定 / Esc / `::backdrop` 内建）、

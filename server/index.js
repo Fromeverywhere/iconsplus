@@ -13,6 +13,7 @@ const users = require('./services/users');
 const store = require('./services/store');
 const importer = require('./services/importer');
 const { createHotlinkMiddleware } = require('./services/hotlink');
+const categories = require('./services/categories');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -244,6 +245,51 @@ app.get('/api/admin/settings', auth.requireSuper, (req, res) => res.json(store.g
 app.post('/api/admin/settings', auth.requireSuper, (req, res) => {
   const saved = store.saveSettings({ hotlink: (req.body || {}).hotlink });
   res.json(saved);
+});
+
+// ============ 分类管理（仅超级管理员） ============
+// 注意：文件夹名 = 外链 URL 键（/images/<文件夹>/<文件>），显示名只是展示层
+app.get('/api/admin/categories', auth.requireSuper, (req, res) => {
+  try {
+    const list = getIcons().map((c) => ({
+      folder: c.name,
+      label: c.label,
+      count: c.icons.length
+    }));
+    res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 修改分类显示名（只改展示层，不影响外链 URL）
+app.put('/api/admin/categories/:folder/label', auth.requireSuper, (req, res) => {
+  try {
+    const meta = categories.setLabel(req.params.folder, (req.body || {}).label);
+    res.json({ ok: true, folder: req.params.folder, label: meta.label });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// 重命名文件夹（磁盘目录 + 缩略图 + 显示名一起迁移；外链 URL 随之变化）
+app.put('/api/admin/categories/:folder/rename', auth.requireSuper, (req, res) => {
+  try {
+    const r = categories.renameFolder(req.params.folder, ((req.body || {}).newName || '').trim());
+    if (thumbnailer.isAvailable()) thumbnailer.start();
+    res.json({ ok: true, ...r, warning: '文件夹已重命名，原 /images/' + encodeURIComponent(req.params.folder) + '/… 外链将 404，请更新引用' });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// 删除分类内的一张图片（原图 + 缩略图）
+app.delete('/api/admin/categories/:folder/icons/:file', auth.requireSuper, (req, res) => {
+  try {
+    res.json(categories.deleteIcon(req.params.folder, req.params.file));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 // ============ 用户管理（仅超级管理员） ============
