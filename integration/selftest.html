@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>icons+ 接入自检</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --line: #e5e7eb; --text: #1f2329; --muted: #6b7280;
+    --brand: #2563eb; --brand-soft: #eff4ff; --ok: #16a34a; --ok-soft: #ecfdf3;
+    --bad: #dc2626; --bad-soft: #fef2f2; --warn: #b45309; --warn-soft: #fffbeb;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 32px 18px 60px; }
+  header h1 { font-size: 22px; margin: 0 0 6px; }
+  header p { margin: 0 0 22px; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
+  .card h2 { font-size: 15px; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  .card h2 .n { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-size: 12px; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+  label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); flex: 1; min-width: 180px; }
+  input[type=text], input[type=password], select {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; color: var(--text); background: #fff; outline: none;
+  }
+  input:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+  button { padding: 9px 18px; border: 0; border-radius: 8px; background: var(--brand); color: #fff; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  button:hover { filter: brightness(.95); }
+  button.ghost { background: #fff; color: var(--brand); border: 1px solid var(--brand); }
+  .hint { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+  .banner { border-radius: 8px; padding: 10px 13px; font-size: 13px; margin-bottom: 14px; }
+  .banner.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid #fde68a; }
+  .banner.ok { background: var(--ok-soft); color: var(--ok); border: 1px solid #bbf7d0; }
+  .banner.bad { background: var(--bad-soft); color: var(--bad); border: 1px solid #fecaca; }
+  .result-head { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .icon-box { width: 88px; height: 88px; border: 1px solid var(--line); border-radius: 12px; background: #fff; display: flex; align-items: center; justify-content: center; flex: none; overflow: hidden; }
+  .icon-box img { width: 100%; height: 100%; object-fit: contain; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .badge.ok { background: var(--ok-soft); color: var(--ok); }
+  .badge.bad { background: var(--bad-soft); color: var(--bad); }
+  .summary { flex: 1; min-width: 200px; }
+  .summary .domain { font-size: 17px; font-weight: 600; }
+  .summary .ref { color: var(--muted); font-size: 12px; word-break: break-all; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { width: 170px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+  td code { background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+  .issues { margin: 16px 0 0; padding: 0; list-style: none; }
+  .issues li { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 9px 12px; border-radius: 0 8px 8px 0; margin-bottom: 8px; }
+  .issues li b { display: block; }
+  .issues li span { color: var(--warn); font-size: 12px; }
+  .advice { margin-top: 14px; padding: 12px 14px; border-radius: 8px; background: var(--brand-soft); color: #1e40af; }
+  .advice .add { display: flex; gap: 10px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .advice code { background: #fff; padding: 4px 10px; border-radius: 6px; font-size: 13px; border: 1px solid #bfdbfe; }
+  .hidden { display: none !important; }
+  footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 26px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>icons+ 接入自检</h1>
+    <p>填一个网址或域名即可自动提取一级域名、拼接 API，真实取回图标并给出诊断。把本页放到你的网站域名下访问，才能正确验证白名单。</p>
+  </header>
+
+  <div class="card">
+    <h2><span class="n">1</span>接入配置</h2>
+    <div class="row">
+      <label>icons+ 地址（只填一个 URL，自动拼 API 路径）
+        <input type="text" id="base" value="https://icons.325hub.top" />
+      </label>
+      <label>调用 Token（icons+ 后台「系统 → API 调用」里复制）
+        <input type="password" id="token" placeholder="粘贴调用 Token" />
+      </label>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <label>优先格式（可选）
+        <select id="format">
+          <option value="">跟随默认</option>
+          <option value="svg">优先 SVG</option>
+          <option value="png">优先 PNG</option>
+        </select>
+      </label>
+      <label>缓存签名直链（消除闪烁）
+        <select id="cacheEnabled"><option value="1">开启（推荐）</option><option value="0">关闭</option></select>
+      </label>
+    </div>
+    <p class="hint">配置只保存在本浏览器，不会上传。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">2</span>测试调用</h2>
+    <div id="refererTip" class="banner warn hidden"></div>
+    <div class="row">
+      <label>网址或域名（一个输入框即可，支持完整网址 / 裸域名 / 带路径）
+        <input type="text" id="target" value="https://www.bilibili.com/" />
+      </label>
+      <button id="go">获取图标并诊断</button>
+    </div>
+    <p class="hint">系统自动从网址提取一级域名（如 <code>www.bilibili.com/video/xx</code> → <code>bilibili.com</code>）再拼接调用链接。</p>
+  </div>
+
+  <div class="card hidden" id="resultCard">
+    <h2><span class="n">3</span>结果与诊断</h2>
+    <div id="statusBanner" class="banner"></div>
+    <div class="result-head">
+      <div class="icon-box"><img id="iconImg" alt="icon" /></div>
+      <div class="summary">
+        <div class="domain" id="rnDomain">—</div>
+        <div class="ref" id="rnRef">—</div>
+        <div style="margin-top:6px"><span id="rnBadge" class="badge"></span></div>
+      </div>
+      <button class="ghost" id="refreshCache">刷新缓存再测</button>
+    </div>
+    <table>
+      <tbody>
+        <tr><th>Token 归属用户</th><td id="rdUser">—</td></tr>
+        <tr><th>Token 状态</th><td id="rdToken">—</td></tr>
+        <tr><th>调用页来源域名</th><td id="rdReferer">—</td></tr>
+        <tr><th>访问 icons+ 的方式</th><td id="rdVia">—</td></tr>
+        <tr><th>客户端 IP</th><td id="rdIp">—</td></tr>
+        <tr><th>白名单校验</th><td id="rdWl">—</td></tr>
+        <tr><th>当前白名单条目</th><td id="rdWlEntries">—</td></tr>
+        <tr><th>域名解析</th><td id="rdTarget">—</td></tr>
+        <tr><th>命中图标层级</th><td id="rdLevel">—</td></tr>
+      </tbody>
+    </table>
+    <ul class="issues hidden" id="rdIssues"></ul>
+    <div class="advice hidden" id="rdAdvice">
+      <div id="rdAdviceText"></div>
+      <div class="add hidden" id="rdAddWrap">
+        <span>建议加入白名单：</span><code id="rdAddValue"></code>
+        <button id="copyAdd">复制</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>icons+ 调用侧适配自检页 · 配合 iconsplus-adapter.js 使用</footer>
+</div>
+
+<script src="./iconsplus-adapter.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var KEY = 'iconsplus:selftest:cfg';
+
+  function loadCfg() {
+    try {
+      var c = JSON.parse(localStorage.getItem(KEY) || '{}');
+      if (c.base) $('base').value = c.base;
+      if (c.token) $('token').value = c.token;
+      if (c.format) $('format').value = c.format;
+      if (c.cacheEnabled === '0') $('cacheEnabled').value = '0';
+    } catch (e) {}
+  }
+  function saveCfg() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({
+        base: $('base').value.trim(), token: $('token').value.trim(),
+        format: $('format').value, cacheEnabled: $('cacheEnabled').value
+      }));
+    } catch (e) {}
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function txt(id, v) { $(id).textContent = v || '—'; }
+
+  function checkReferer() {
+    var tip = $('refererTip');
+    // 本页若非 http(s) 打开，浏览器不会带 Referer，白名单无法验证
+    if (!/^https?:$/.test(location.protocol)) {
+      tip.textContent = '当前是本地文件打开（file://），浏览器不会携带 Referer，白名单校验会判为「无来源」。请把本页上传到你的网站域名下再测。';
+      tip.classList.remove('hidden');
+    } else {
+      tip.textContent = '当前页面来源：' + location.host + '。若该域名未加入 icons+ 个人白名单，诊断会提示 not_whitelisted。';
+      tip.classList.remove('hidden');
+    }
+  }
+
+  function render(diag, target) {
+    $('resultCard').classList.remove('hidden');
+    var banner = $('statusBanner');
+    var ok = diag && diag.ok && diag.icon && diag.icon.url;
+    banner.className = 'banner ' + (ok ? 'ok' : 'bad');
+    banner.textContent = ok
+      ? '调用成功：图标已真实回传。下面是本次调用的完整诊断。'
+      : '调用未成功：下面是诊断详情，请按「建议」修正后重试。';
+
+    txt('rnDomain', diag ? (diag.target.domain || target) : target);
+    txt('rnRef', diag && diag.icon ? diag.icon.ref : '未解析到图标');
+    var badge = $('rnBadge');
+    badge.className = 'badge ' + (ok ? 'ok' : 'bad');
+    badge.textContent = ok ? '调用成功' : '调用失败';
+
+    txt('rdUser', diag ? diag.token.username : '');
+    txt('rdToken', diag ? (diag.token.valid ? (diag.token.expired ? '已过期' : '有效') : '无效') : '');
+    txt('rdReferer', diag ? (diag.request.refererHost || '无（浏览器未携带 Referer）') : '');
+    txt('rdVia', diag ? (diag.request.iconsplusVia === 'ip'
+      ? 'IP（' + diag.request.requestHost + '）'
+      : '域名（' + diag.request.requestHost + '）') : '');
+    txt('rdIp', diag ? diag.request.clientIp : '');
+    txt('rdWl', diag ? (diag.whitelist.hit ? '已命中 · ' + diag.whitelist.reason : '未命中 / 未配置（' + (diag.whitelist.reason || '—') + '）') : '');
+    txt('rdWlEntries', diag ? (diag.whitelist.entries.length ? diag.whitelist.entries.join('、') : '（空）') : '');
+    txt('rdTarget', diag ? (diag.target.raw ? diag.target.raw + ' → ' + (diag.target.domain || '无法解析') : '—') : '');
+    txt('rdLevel', diag && diag.icon ? diag.icon.level : '');
+
+    var issues = $('rdIssues');
+    issues.innerHTML = '';
+    if (diag && diag.issues && diag.issues.length) {
+      for (var i = 0; i < diag.issues.length; i++) {
+        var it = diag.issues[i];
+        var li = document.createElement('li');
+        li.innerHTML = '<b>' + esc(it.message) + '</b><span>' + esc(it.fix) + '</span>';
+        issues.appendChild(li);
+      }
+      issues.classList.remove('hidden');
+    } else { issues.classList.add('hidden'); }
+
+    var adv = $('rdAdvice');
+    if (diag && diag.advice && diag.advice.message) {
+      $('rdAdviceText').textContent = diag.advice.message;
+      adv.classList.remove('hidden');
+      if (diag.advice.addToWhitelist) {
+        $('rdAddValue').textContent = diag.advice.addToWhitelist;
+        $('rdAddWrap').classList.remove('hidden');
+      } else { $('rdAddWrap').classList.add('hidden'); }
+    } else { adv.classList.add('hidden'); }
+  }
+
+  function applyCfg() {
+    if (typeof window.IconPlus === 'undefined') {
+      alert('未找到 iconsplus-adapter.js，请把本页与适配文件放在同一目录。');
+      return false;
+    }
+    saveCfg();
+    // 只传 base（可含 /api/icon 路径，适配层自动拆分），不必单独填 apiPath
+    window.IconPlus.configure({
+      base: $('base').value.trim(),
+      token: $('token').value.trim(),
+      format: $('format').value,
+      cacheEnabled: $('cacheEnabled').value === '1'
+    });
+    return window.IconPlus.ready();
+  }
+
+  function run(force) {
+    if (!applyCfg()) { alert('请先填写 icons+ 地址和调用 Token。'); return; }
+    var target = $('target').value.trim();
+    if (!target) { alert('请填写要测试的网址或域名。'); return; }
+    var domain = window.IconPlus.extractDomain(target);
+    txt('rnDomain', domain);
+    var img = $('iconImg');
+    img.removeAttribute('src');
+    $('go').disabled = true;
+    $('go').textContent = '诊断中…';
+
+    // 诊断与图标并行：诊断给出结论，resolveAsync 拿签名直链真实回传图标
+    window.IconPlus.diagnose(target, function (diag) {
+      render(diag, target);
+    });
+    window.IconPlus.resolveAsync(target, function (url) {
+      if (url) img.setAttribute('src', url);
+      $('go').disabled = false;
+      $('go').textContent = '获取图标并诊断';
+    }, !!force);
+  }
+
+  $('go').addEventListener('click', function () { run(false); });
+  $('refreshCache').addEventListener('click', function () {
+    window.IconPlus.clearCache();
+    run(true);
+  });
+  $('copyAdd').addEventListener('click', function () {
+    var v = $('rdAddValue').textContent;
+    if (!v) return;
+    try { navigator.clipboard.writeText(v); } catch (e) {}
+    this.textContent = '已复制';
+    var self = this;
+    setTimeout(function () { self.textContent = '复制'; }, 1500);
+  });
+
+  loadCfg();
+  checkReferer();
+})();
+</script>
+</body>
+</html>
