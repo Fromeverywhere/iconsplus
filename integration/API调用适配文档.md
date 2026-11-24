@@ -92,6 +92,45 @@ function SiteIcon({ url }) {
 }
 ```
 
+## 图标来源切到 icons+ 时：图标地址字段留空、置灰提示
+
+很多调用方的表单里本来有一个「图标地址 / 图标 URL」输入框，让用户手填一个图片链接。接入 icons+ 后建议加一个**图标来源**选择（如「自定义地址 / icons+ 提供」）。当用户选择 **icons+** 时：
+
+- **图标地址字段直接留空、不显示**（不要让用户填，也不要把 icons+ 的 API 链接塞进去——那个由适配层拼）
+- 在原位置显示一条**置灰、不可编辑**的提示：**已由icons+提供图标**
+- 图标来源重新切回「自定义地址」时，恢复原来的输入框和值
+
+适配文件内置了 helper，一行即可落地：
+
+```js
+// 表单里有个 <input id="siteIconUrl">，来源切到 icons+ 时：
+var restore = IconPlus.markProvided('#siteIconUrl', {
+  hint: '已由icons+提供图标'   // 可省略，默认就是这个文案
+});
+// 切回「自定义地址」时还原：
+restore();
+```
+
+`markProvided(field, opts)`：
+| 参数 | 说明 |
+|---|---|
+| `field` | 图标地址输入框节点或 CSS 选择器 |
+| `opts.hint` | 提示词，默认 `已由icons+提供图标` |
+| `opts.container` | 提示插入的父节点，默认输入框的父节点 |
+| `opts.hintClass` | 提示元素 class，默认 `iconsplus-provided-hint` |
+| 返回值 | `restore()` 函数，调用后恢复输入框显示与原值 |
+
+配套的两条 class 可自行写样式（适配文件不强制注入 CSS，`hintClass` 和 `inputClass` 都可改）：
+
+```css
+.iconsplus-provided-hint { color: var(--muted, #999); font-size: .9em; font-style: italic; }
+.iconsplus-provided-input { display: none; }
+```
+
+若只改文案不改状态，用 `IconPlus.setProvidedHint('新文案')`；提示词常量为 `IconPlus.PROVIDED_HINT`。
+
+> 该 helper 只做**视觉隐藏**，不清空输入框的值——切回自定义来源时原值还在。真正提交时由调用方根据自己的「图标来源」决定写不写地址字段：来源为 icons+ 就把地址字段置空入库，展示侧统一用 `IconPlus.icon(网址)` / `applyTo()` 出图。
+
 ## 消除「空白跳一下到图标」的闪烁
 
 **为什么原来会闪**：老版 `<img src="/api/icon?...">` 走两跳——第一跳到解析层（每次回源、`no-store`，期间图片是空白），第二跳才到真正的图片。有本地缓存的直链图片只有一跳，所以不会闪。
@@ -155,6 +194,8 @@ IconPlus.diagnose('bilibili.com', function (diag) {
 | `resolveAsync(url, cb, force?)` | 异步取签名直链并缓存；`force=true` 强制刷新 |
 | `warm(domains, cb?)` | 批量预热域名直链 |
 | `diagnose(url, cb)` | 真实调用一次并返回完整诊断 JSON |
+| `markProvided(field, opts?)` | 图标来源切到 icons+：地址字段留空隐藏 + 置灰提示「已由icons+提供图标」，返回 restore() |
+| `setProvidedHint(text?, container?)` | 只更新置灰提示词；`PROVIDED_HINT` 为默认文案常量 |
 | `clearCache(domain?)` | 清缓存；不传域名则清空 |
 | `status()` | 当前配置快照（token 脱敏），后台自检用 |
 | `ready()` | 配置是否完整 |
