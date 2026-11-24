@@ -15,6 +15,10 @@
  *     之后 <img> 直连 CDN 一跳命中，消除「302 两跳 → 空白跳一下」
  *   - diagnose()：真实跑一次调用并返回诊断（token 归属用户名、来源域名/IP、白名单命中、该加哪条）
  *
+ * 1.1.1 新增：
+ *   - markProvided()：调用方「图标来源 = icons+」时，把图标地址字段留空隐藏并
+ *     显示置灰提示「已由icons+提供图标」；返回 restore() 供切回自定义时还原
+ *
  * 依赖：无。ES5 语法，UMD 包装，浏览器 / CommonJS / ESM 均可。
  */
 (function (root, factory) {
@@ -51,6 +55,9 @@
   };
 
   var _memCache = {}; // localStorage 不可用时的内存兜底
+
+  // 「图标来源 = icons+」时展示的置灰提示词，调用方可改
+  var PROVIDED_HINT = '已由icons+提供图标';
 
   function trimSlash(s) { return String(s || '').replace(/\/+$/, ''); }
 
@@ -324,6 +331,62 @@
     return n;
   }
 
+  /** 调用方表单：图标来源切成 icons+ 时，把「图标地址」字段留空不显示，
+   *  并在原位置显示一条置灰提示「已由icons+提供图标」。
+   *  @param field  地址输入框节点，或 CSS 选择器（如 '#siteIconUrl'）
+   *  @param opts   { hint: 自定义提示词, container: 提示插入的父节点（默认字段父节点）,
+   *                  hintClass: 提示元素 class, inputClass: 置灰 class }
+   *  @returns 还原函数 restore()：切回自定义来源时调用，恢复输入框与提示
+   *
+   *  约定：地址值不清空数据库，只做视觉隐藏（隐藏输入框 + 置灰提示），
+   *  这样切回自定义时值还在。真正提交时由调用方按「来源」决定写不写地址字段。 */
+  function markProvided(field, opts) {
+    if (typeof document === 'undefined') return function () {};
+    var el = field;
+    if (typeof field === 'string') el = document.querySelector(field);
+    if (!el) return function () {};
+    var o = opts || {};
+    var hintText = o.hint || PROVIDED_HINT;
+    var parent = o.container || el.parentNode || document.body;
+    var hintClass = o.hintClass || 'iconsplus-provided-hint';
+    var inputClass = o.inputClass || 'iconsplus-provided-input';
+    var hideKey = '_iconsplusPrevDisplay';
+
+    // 幂等：已有提示则只更新文案
+    var existing = parent.querySelector ? parent.querySelector('.' + hintClass) : null;
+    if (existing) { existing.textContent = hintText; return function () {}; }
+
+    var span = document.createElement('span');
+    span.className = hintClass;
+    span.setAttribute('aria-disabled', 'true');
+    span.textContent = hintText;
+
+    var prevDisplay = el.style.display;
+    el.setAttribute(hideKey, prevDisplay == null || prevDisplay === '' ? '' : prevDisplay);
+    el.style.display = 'none';
+    el.classList.add(inputClass);
+    if (parent.insertBefore) parent.insertBefore(span, el.nextSibling);
+    else parent.appendChild(span);
+
+    return function restoreProvided() {
+      if (span && span.parentNode) span.parentNode.removeChild(span);
+      el.classList.remove(inputClass);
+      var prev = el.getAttribute(hideKey);
+      el.style.display = prev == null ? '' : prev;
+      el.removeAttribute(hideKey);
+    };
+  }
+
+  /** 更新已存在的置灰提示词（不改输入框状态）。找不到提示返回 false。 */
+  function setProvidedHint(text, container) {
+    if (typeof document === 'undefined') return false;
+    var scope = container || document;
+    var el = scope.querySelector ? scope.querySelector('.iconsplus-provided-hint') : null;
+    if (!el) return false;
+    el.textContent = text || PROVIDED_HINT;
+    return true;
+  }
+
   /** 返回当前配置快照（脱敏 token），便于后台自检 */
   function status() {
     return {
@@ -348,9 +411,13 @@
     warm: warm,
     diagnose: diagnose,
     clearCache: clearCache,
+    markProvided: markProvided,
+    restoreProvided: setProvidedHint,
+    setProvidedHint: setProvidedHint,
+    PROVIDED_HINT: PROVIDED_HINT,
     status: status,
     ready: ready,
-    version: '1.1.0'
+    version: '1.1.1'
   };
   return api;
 });
